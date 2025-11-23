@@ -1,0 +1,16 @@
+{
+  "pageId": "home",
+  "content": {
+    "heroTitle": "Welcome to NodeLx",
+    "heroSubtitle": "Build beautiful sites with live editing",
+    "heroImage": "/images/hero.jpg",
+    "aboutText": "NodeLx is a developer-first CMS that combines the power of code with the simplicity of visual editing.",
+    "ctaText": "Get Started",
+    "ctaLink": "/docs"
+  },
+  "metadata": {
+    "title": "Home Page",
+    "lastModified": "2025-11-23T00:00:00Z",
+    "author": "system"
+  }
+}
