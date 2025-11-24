@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import DebugConsole from './DebugConsole';
 import './HomePage.css';
 
 /**
@@ -6,6 +7,14 @@ import './HomePage.css';
  * The data-editable attribute marks regions that can be edited by clients
  */
 function HomePage({ content }) {
+  const [websiteUrl, setWebsiteUrl] = useState('http://localhost:3000');
+  const [localPath, setLocalPath] = useState('C:\\Users\\Allied Gaming\\Documents\\GitHub\\austin-crate');
+
+  const handleConnect = () => {
+    console.log('Connecting to:', { websiteUrl, localPath });
+    // TODO: Send this to the backend to establish connection
+  };
+
   return (
     <div className="home-page">
       {/* Hero Section */}
@@ -25,6 +34,38 @@ function HomePage({ content }) {
             {content.heroSubtitle}
           </p>
 
+          {/* Connection Configuration */}
+          <div className="connection-config">
+            <div className="input-group">
+              <label htmlFor="website-url">Website URL</label>
+              <input
+                id="website-url"
+                type="text"
+                value={websiteUrl}
+                onChange={(e) => setWebsiteUrl(e.target.value)}
+                placeholder="http://localhost:3000"
+              />
+            </div>
+
+            <div className="input-group">
+              <label htmlFor="local-path">Local Project Path</label>
+              <input
+                id="local-path"
+                type="text"
+                value={localPath}
+                onChange={(e) => setLocalPath(e.target.value)}
+                placeholder="C:\path\to\your\project"
+              />
+            </div>
+
+            <button
+              onClick={handleConnect}
+              className="connect-button"
+            >
+              Connect & Edit
+            </button>
+          </div>
+
           <button
             data-editable="ctaText"
             className="cta-button"
@@ -43,44 +84,8 @@ function HomePage({ content }) {
         </div>
       </section>
 
-      {/* About Section */}
-      <section className="about">
-        <h2>About NodeLx</h2>
-
-        <p
-          data-editable="aboutText"
-          className="about-text"
-        >
-          {content.aboutText}
-        </p>
-      </section>
-
-      {/* Features Section */}
-      <section className="features">
-        <h2>Features</h2>
-
-        <div className="feature-grid">
-          <div className="feature-card">
-            <h3>🎨 Live Preview</h3>
-            <p>See changes instantly as you code or edit content</p>
-          </div>
-
-          <div className="feature-card">
-            <h3>💻 Developer First</h3>
-            <p>Full control with React, JSX, and your favorite tools</p>
-          </div>
-
-          <div className="feature-card">
-            <h3>✏️ Client Editing</h3>
-            <p>Simple interface for clients to edit content safely</p>
-          </div>
-
-          <div className="feature-card">
-            <h3>🚀 Easy Deploy</h3>
-            <p>Push to production with Supabase integration</p>
-          </div>
-        </div>
-      </section>
+      {/* Debug Panel */}
+      <DebugConsole />
     </div>
   );
 }

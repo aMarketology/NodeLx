@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NodeLx Test Preview</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 2rem;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .container {
+      max-width: 800px;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 3rem;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+    h1 {
+      font-size: 3rem;
+      margin: 0 0 1rem 0;
+    }
+    .badge {
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.2);
+      padding: 0.5rem 1rem;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+    }
+    .content {
+      font-size: 1.25rem;
+      line-height: 1.8;
+      margin: 2rem 0;
+    }
+    .status {
+      margin-top: 2rem;
+      padding: 1rem;
+      background: rgba(46, 213, 115, 0.2);
+      border-radius: 10px;
+      border: 2px solid rgba(46, 213, 115, 0.5);
+    }
+    .loading {
+      text-align: center;
+      padding: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="badge" id="badge">Loading...</div>
+    <h1 id="title">Loading content...</h1>
+    <div class="content" id="content">
+      <p>Connecting to NodeLx API...</p>
+    </div>
+    <div class="status">
+      <strong>🔗 Connected to NodeLx!</strong>
+      <div style="font-size: 0.9rem; margin-top: 0.5rem;">
+        This page is dynamically loading content from:
+        <code style="background: rgba(0,0,0,0.3); padding: 0.25rem 0.5rem; border-radius: 4px; display: inline-block; margin-top: 0.5rem;">
+          http://localhost:3001/api/content/austin-crate-home
+        </code>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Fetch content from NodeLx API
+    async function loadContent() {
+      try {
+        const response = await fetch('http://localhost:3001/api/content/austin-crate-home');
+        const data = await response.json();
+        
+        // Update the page with content
+        document.getElementById('badge').textContent = data.content.locationBadge || 'Austin, Texas';
+        document.getElementById('title').textContent = 
+          `${data.content.mainHeadline || 'Austin Crate'} ${data.content.subHeadline || '& Freight'}`;
+        
+        document.getElementById('content').innerHTML = `
+          <p><strong>${data.content.heroTagline || 'Loading...'}</strong></p>
+          <p>${data.content.heroDescription || 'Loading description...'}</p>
+          <p style="font-size: 2rem; margin-top: 1rem;">📞 ${data.content.phoneNumber || '(512) 240-9818'}</p>
+        `;
+
+        console.log('✅ Content loaded successfully:', data);
+      } catch (error) {
+        console.error('❌ Error loading content:', error);
+        document.getElementById('content').innerHTML = `
+          <p style="color: #ff4757;">⚠️ Could not connect to NodeLx API</p>
+          <p style="font-size: 0.9rem;">Make sure the server is running on port 3001</p>
+        `;
+      }
+    }
+
+    // Load content on page load
+    loadContent();
+
+    // Setup WebSocket for live updates
+    try {
+      const ws = new WebSocket('ws://localhost:3001');
+      
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'content-store-update') {
+          console.log('🔄 Content updated, reloading...');
+          loadContent();
+        }
+      };
+
+      ws.onopen = () => {
+        console.log('✅ WebSocket connected - live updates enabled!');
+      };
+    } catch (error) {
+      console.log('WebSocket not available:', error);
+    }
+  </script>
+</body>
+</html>

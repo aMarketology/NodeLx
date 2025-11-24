@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import HomePage from './components/HomePage';
+import ContentEditor from './components/ContentEditor';
 import './App.css';
 
 /**
@@ -13,16 +14,13 @@ function App() {
   const [highlightedElement, setHighlightedElement] = useState(null);
 
   useEffect(() => {
-    // Load initial content
     loadContent();
-
-    // Setup WebSocket connection
     setupWebSocket();
   }, []);
 
   const loadContent = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/content/home');
+      const response = await fetch('http://localhost:3001/api/content/home');
       const data = await response.json();
       setContent(data.content);
       setLoading(false);
@@ -33,7 +31,7 @@ function App() {
   };
 
   const setupWebSocket = () => {
-    const ws = new WebSocket('ws://localhost:3000');
+    const ws = new WebSocket('ws://localhost:3001');
 
     ws.onopen = () => {
       console.log('[WebSocket] Connected to server');

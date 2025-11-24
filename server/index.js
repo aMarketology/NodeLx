@@ -1,6 +1,7 @@
 const express = require('express');
 const http = require('http');
 const path = require('path');
+const cors = require('cors');
 const ContentStore = require('./contentStore');
 const WebSocketServer = require('./websocket');
 const SourceMapper = require('./sourceMap');
@@ -11,7 +12,7 @@ const SourceMapper = require('./sourceMap');
  */
 class NodeLxServer {
   constructor(options = {}) {
-    this.port = options.port || 3000;
+    this.port = options.port || 3001;
     this.app = express();
     this.server = http.createServer(this.app);
 
@@ -23,6 +24,10 @@ class NodeLxServer {
 
   async initialize() {
     // Middleware
+    this.app.use(cors({
+      origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174'],
+      credentials: true
+    }));
     this.app.use(express.json());
     this.app.use(express.static('public'));
 
@@ -133,7 +138,7 @@ class NodeLxServer {
 
 // Start server if run directly
 if (require.main === module) {
-  const server = new NodeLxServer({ port: 3000 });
+  const server = new NodeLxServer({ port: 3001 });
 
   server
     .initialize()

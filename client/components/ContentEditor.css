@@ -1,0 +1,237 @@
+.editor-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%);
+  padding: 2rem;
+}
+
+.editor-header {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.editor-header h1 {
+  color: #fff;
+  margin: 0 0 0.5rem 0;
+  font-size: 2rem;
+  font-weight: 300;
+}
+
+.editor-page-id {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.9rem;
+  font-family: 'Courier New', monospace;
+}
+
+.editor-message {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  animation: slideIn 0.3s ease-out;
+}
+
+.editor-message.success {
+  background: rgba(46, 213, 115, 0.15);
+  border: 1px solid rgba(46, 213, 115, 0.3);
+  color: #2ed573;
+}
+
+.editor-message.error {
+  background: rgba(255, 71, 87, 0.15);
+  border: 1px solid rgba(255, 71, 87, 0.3);
+  color: #ff4757;
+}
+
+.editor-loading {
+  color: rgba(255, 255, 255, 0.6);
+  text-align: center;
+  padding: 3rem;
+  font-size: 1.1rem;
+}
+
+.editor-content {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 2rem;
+}
+
+.editor-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.editor-field {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 1.25rem;
+  transition: all 0.2s ease;
+}
+
+.editor-field:hover {
+  border-color: rgba(99, 179, 237, 0.3);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.editor-field-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.editor-field-label {
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 500;
+  font-size: 0.9rem;
+  font-family: 'Courier New', monospace;
+  background: rgba(99, 179, 237, 0.1);
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+}
+
+.editor-edit-btn {
+  background: rgba(99, 179, 237, 0.15);
+  color: #63b3ed;
+  border: 1px solid rgba(99, 179, 237, 0.3);
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.editor-edit-btn:hover {
+  background: rgba(99, 179, 237, 0.25);
+  border-color: rgba(99, 179, 237, 0.5);
+  transform: translateY(-1px);
+}
+
+.editor-field-value {
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.6;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.editor-field-editing {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.editor-textarea {
+  width: 100%;
+  min-height: 100px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 2px solid rgba(99, 179, 237, 0.3);
+  border-radius: 6px;
+  padding: 0.75rem;
+  color: #fff;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  font-family: inherit;
+  resize: vertical;
+  transition: border-color 0.2s ease;
+}
+
+.editor-textarea:focus {
+  outline: none;
+  border-color: rgba(99, 179, 237, 0.6);
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.editor-field-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.editor-save-btn,
+.editor-cancel-btn {
+  padding: 0.65rem 1.5rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.editor-save-btn {
+  background: linear-gradient(135deg, #2ed573 0%, #26d0ce 100%);
+  color: white;
+}
+
+.editor-save-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(46, 213, 115, 0.4);
+}
+
+.editor-save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.editor-cancel-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.editor-cancel-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.editor-hint {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .editor-container {
+    padding: 1rem;
+  }
+
+  .editor-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .editor-field-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .editor-field-actions {
+    flex-direction: column;
+  }
+
+  .editor-save-btn,
+  .editor-cancel-btn {
+    width: 100%;
+  }
+}
