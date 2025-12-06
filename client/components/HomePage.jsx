@@ -6,13 +6,16 @@ import './HomePage.css';
  * Sample HomePage component with editable regions
  * The data-editable attribute marks regions that can be edited by clients
  */
-function HomePage({ content }) {
+function HomePage({ content, onLaunchEditor }) {
   const [websiteUrl, setWebsiteUrl] = useState('http://localhost:3000');
   const [localPath, setLocalPath] = useState('C:\\Users\\Allied Gaming\\Documents\\GitHub\\austin-crate');
 
   const handleConnect = () => {
     console.log('Connecting to:', { websiteUrl, localPath });
-    // TODO: Send this to the backend to establish connection
+    // Launch the split-view editor
+    if (onLaunchEditor) {
+      onLaunchEditor({ websiteUrl, localPath });
+    }
   };
 
   return (

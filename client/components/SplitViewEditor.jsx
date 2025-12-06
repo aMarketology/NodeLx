@@ -1,46 +1,90 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './SplitViewEditor.css';
 
-/**
- * Split View Editor with Live Preview
- * Left side: Content editor
- * Right side: Live iframe preview of the actual site
- */
-function SplitViewEditor({ pageId = 'austin-crate-home', previewUrl = 'http://localhost:3000' }) {
+function SplitViewEditor({ 
+  pageId = 'austin-crate-home', 
+  previewUrl = 'http://localhost:3000',
+  onBack 
+}) {
   const [content, setContent] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [editingField, setEditingField] = useState(null);
   const [editValue, setEditValue] = useState('');
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState({ text: '', type: '' });
   const [currentUrl, setCurrentUrl] = useState(previewUrl);
-  const [viewportSize, setViewportSize] = useState('desktop'); // desktop, tablet, mobile
-  const [iframeError, setIframeError] = useState(false);
+  const [viewportSize, setViewportSize] = useState('desktop');
   const [iframeLoading, setIframeLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [splitPosition, setSplitPosition] = useState(35);
+  
   const iframeRef = useRef(null);
+  const API_URL = 'http://localhost:3001';
 
   useEffect(() => {
-    window.debugLog?.('info', 'SplitView', `Initializing SplitViewEditor for page: ${pageId}`);
-    window.debugLog?.('info', 'SplitView', `Preview URL set to: ${previewUrl}`);
+    console.log('[SplitViewEditor] Mounting with pageId:', pageId);
     loadContent();
   }, [pageId]);
 
+  useEffect(() => {
+    if (message.text) {
+      const timer = setTimeout(() => setMessage({ text: '', type: '' }), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [message]);
+
   const loadContent = async () => {
-    window.debugLog?.('info', 'Content', `Loading content for: ${pageId}`);
+    setLoading(true);
+    setError(null);
+    
     try {
-      const response = await fetch(`http://localhost:3001/api/content/${pageId}`);
+      const response = await fetch(`${API_URL}/api/content/${pageId}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
       const data = await response.json();
-      setContent(data.content);
-      window.debugLog?.('success', 'Content', `Loaded ${Object.keys(data.content).length} fields`);
-    } catch (error) {
-      console.error('Error loading content:', error);
-      setMessage('Failed to load content');
-      window.debugLog?.('error', 'Content', `Failed to load: ${error.message}`);
+      const contentData = data.content || data;
+      setContent(contentData);
+      setLoading(false);
+    } catch (err) {
+      console.error('[SplitViewEditor] Error:', err);
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  const saveField = async () => {
+    if (!editingField || saving) return;
+    setSaving(true);
+
+    try {
+      const response = await fetch(`${API_URL}/api/content/${pageId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: { [editingField]: editValue } }),
+      });
+
+      if (!response.ok) throw new Error('Failed to save');
+
+      const updated = await response.json();
+      setContent(updated.content || updated);
+      setMessage({ text: `✓ Saved "${editingField}"`, type: 'success' });
+      setEditingField(null);
+      setEditValue('');
+      setTimeout(() => refreshPreview(), 500);
+    } catch (err) {
+      setMessage({ text: `Error: ${err.message}`, type: 'error' });
+    } finally {
+      setSaving(false);
     }
   };
 
   const startEditing = (field, value) => {
     setEditingField(field);
-    setEditValue(value);
+    setEditValue(value || '');
   };
 
   const cancelEditing = () => {
@@ -48,52 +92,8 @@ function SplitViewEditor({ pageId = 'austin-crate-home', previewUrl = 'http://lo
     setEditValue('');
   };
 
-  const saveField = async () => {
-    if (!editingField) return;
-
-    setSaving(true);
-    setMessage('');
-
-    try {
-      const response = await fetch(`http://localhost:3001/api/content/${pageId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          content: {
-            [editingField]: editValue
-          }
-        }),
-      });
-
-      if (response.ok) {
-        const updated = await response.json();
-        setContent(updated.content);
-        setMessage(`✓ Saved: ${editingField}`);
-        setEditingField(null);
-        setEditValue('');
-        
-        // Reload the iframe to show changes after a brief delay
-        setTimeout(() => {
-          refreshPreview();
-        }, 500);
-        
-        // Clear success message after 3 seconds
-        setTimeout(() => setMessage(''), 3000);
-      } else {
-        setMessage('Failed to save changes');
-      }
-    } catch (error) {
-      console.error('Error saving:', error);
-      setMessage('Error saving changes');
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       saveField();
     } else if (e.key === 'Escape') {
@@ -104,214 +104,212 @@ function SplitViewEditor({ pageId = 'austin-crate-home', previewUrl = 'http://lo
   const refreshPreview = () => {
     if (iframeRef.current) {
       setIframeLoading(true);
-      setIframeError(false);
-      window.debugLog?.('info', 'Iframe', `Refreshing preview: ${currentUrl}`);
-      // Force reload by setting src to itself with timestamp
-      const url = new URL(iframeRef.current.src);
-      url.searchParams.set('_refresh', Date.now());
-      iframeRef.current.src = url.toString();
+      iframeRef.current.src = currentUrl + '?_t=' + Date.now();
     }
   };
 
-  const handleIframeLoad = () => {
-    setIframeLoading(false);
-    setIframeError(false);
-    window.debugLog?.('success', 'Iframe', `Preview loaded successfully: ${currentUrl}`);
-  };
-
-  const handleIframeError = () => {
-    setIframeLoading(false);
-    setIframeError(true);
-    window.debugLog?.('error', 'Iframe', `Failed to load preview: ${currentUrl}`);
-  };
-
-  const changeViewport = (size) => {
-    setViewportSize(size);
-  };
-
-  const getIframeWidth = () => {
+  const getViewportWidth = () => {
     switch (viewportSize) {
-      case 'mobile':
-        return '375px';
-      case 'tablet':
-        return '768px';
-      case 'desktop':
-      default:
-        return '100%';
+      case 'mobile': return '375px';
+      case 'tablet': return '768px';
+      default: return '100%';
     }
   };
 
-  if (!content) {
+  const filteredContent = content ? Object.entries(content).filter(([key, value]) => {
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    return key.toLowerCase().includes(term) || 
+           (typeof value === 'string' && value.toLowerCase().includes(term));
+  }) : [];
+
+  if (loading) {
     return (
-      <div className="split-view-loading">
-        <div className="loading-spinner"></div>
-        <p>Loading editor...</p>
+      <div className="split-editor-loading">
+        <div className="loading-content">
+          <div className="spinner"></div>
+          <h2>Loading Editor</h2>
+          <p>Connecting to {API_URL}...</p>
+          {onBack && <button onClick={onBack} className="back-btn">← Back</button>}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="split-editor-error">
+        <div className="error-content">
+          <div className="error-icon">⚠️</div>
+          <h2>Failed to Load Content</h2>
+          <p>{error}</p>
+          <p>Make sure NodeLx server is running: <code>npm run dev</code></p>
+          <div className="error-actions">
+            <button onClick={loadContent} className="retry-btn">↻ Retry</button>
+            {onBack && <button onClick={onBack} className="back-btn">← Back</button>}
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="split-view-container">
-      {/* Left Panel - Content Editor */}
-      <div className="split-view-editor">
-        <div className="editor-panel-header">
-          <h2>Content Editor</h2>
-          <div className="editor-page-badge">{pageId}</div>
+    <div className="split-editor-container">
+      <header className="split-editor-header">
+        <div className="header-left">
+          {onBack && <button onClick={onBack} className="header-back-btn">←</button>}
+          <h1 className="header-title">NodeLx Editor</h1>
+          <span className="header-page-badge">{pageId}</span>
+        </div>
+        
+        <div className="header-center">
+          {message.text && (
+            <div className={`header-message ${message.type}`}>{message.text}</div>
+          )}
         </div>
 
-        {message && (
-          <div className={`split-message ${message.startsWith('✓') ? 'success' : 'error'}`}>
-            {message}
+        <div className="header-right">
+          <div className="viewport-controls">
+            <button 
+              className={`viewport-btn ${viewportSize === 'mobile' ? 'active' : ''}`}
+              onClick={() => setViewportSize('mobile')} title="Mobile">📱</button>
+            <button 
+              className={`viewport-btn ${viewportSize === 'tablet' ? 'active' : ''}`}
+              onClick={() => setViewportSize('tablet')} title="Tablet">📱</button>
+            <button 
+              className={`viewport-btn ${viewportSize === 'desktop' ? 'active' : ''}`}
+              onClick={() => setViewportSize('desktop')} title="Desktop">🖥️</button>
           </div>
-        )}
+          <button onClick={refreshPreview} className="refresh-btn" title="Refresh">↻</button>
+        </div>
+      </header>
 
-        <div className="editor-fields-list">
-          {Object.entries(content).map(([field, value]) => (
-            <div key={field} className="editor-field-item">
-              <div className="field-header">
-                <label className="field-label">{field}</label>
-                {editingField !== field && (
-                  <button
-                    className="field-edit-btn"
-                    onClick={() => startEditing(field, value)}
-                  >
-                    ✎ Edit
-                  </button>
-                )}
+      <div className="split-editor-main">
+        <div className="editor-panel" style={{ width: `${splitPosition}%` }}>
+          <div className="editor-toolbar">
+            <div className="search-box">
+              <span className="search-icon">🔍</span>
+              <input
+                type="text"
+                placeholder="Search fields..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="search-input"
+              />
+              {searchTerm && <button className="search-clear" onClick={() => setSearchTerm('')}>✕</button>}
+            </div>
+            <span className="field-count">{filteredContent.length} fields</span>
+          </div>
+
+          <div className="editor-fields">
+            {filteredContent.length === 0 ? (
+              <div className="no-fields">
+                <p>{searchTerm ? `No fields match "${searchTerm}"` : 'No content found'}</p>
               </div>
-
-              {editingField === field ? (
-                <div className="field-editing">
-                  <textarea
-                    className="field-textarea"
-                    value={editValue}
-                    onChange={(e) => setEditValue(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    autoFocus
-                    rows={3}
-                  />
-                  <div className="field-actions">
-                    <button
-                      className="btn-save"
-                      onClick={saveField}
-                      disabled={saving}
-                    >
-                      {saving ? 'Saving...' : '✓ Save'}
-                    </button>
-                    <button
-                      className="btn-cancel"
-                      onClick={cancelEditing}
-                      disabled={saving}
-                    >
-                      ✕ Cancel
-                    </button>
+            ) : (
+              filteredContent.map(([field, value]) => (
+                <div key={field} className={`field-item ${editingField === field ? 'editing' : ''}`}>
+                  <div className="field-header">
+                    <label className="field-name">{field}</label>
+                    {editingField !== field && (
+                      <button className="field-edit-btn" onClick={() => startEditing(field, value)}>✎ Edit</button>
+                    )}
                   </div>
-                  <div className="field-hint">
-                    Press Enter to save • Esc to cancel
-                  </div>
-                </div>
-              ) : (
-                <div className="field-value">
-                  {value}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
 
-      {/* Right Panel - Live Preview */}
-      <div className="split-view-preview">
-        <div className="preview-panel-header">
-          <h2>Live Preview</h2>
-          
-          <div className="preview-controls">
-            {/* Viewport Size Toggle */}
-            <div className="viewport-toggle">
-              <button
-                className={`viewport-btn ${viewportSize === 'mobile' ? 'active' : ''}`}
-                onClick={() => changeViewport('mobile')}
-                title="Mobile View"
-              >
-                📱
-              </button>
-              <button
-                className={`viewport-btn ${viewportSize === 'tablet' ? 'active' : ''}`}
-                onClick={() => changeViewport('tablet')}
-                title="Tablet View"
-              >
-                📱︎
-              </button>
-              <button
-                className={`viewport-btn ${viewportSize === 'desktop' ? 'active' : ''}`}
-                onClick={() => changeViewport('desktop')}
-                title="Desktop View"
-              >
-                🖥️
-              </button>
-            </div>
-
-            {/* Refresh Button */}
-            <button className="refresh-btn" onClick={refreshPreview} title="Refresh Preview">
-              ↻ Refresh
-            </button>
+                  {editingField === field ? (
+                    <div className="field-editor">
+                      <textarea
+                        className="field-textarea"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        autoFocus
+                        rows={Math.min(10, Math.max(3, (editValue || '').split('\n').length + 1))}
+                      />
+                      <div className="field-actions">
+                        <button className="btn-save" onClick={saveField} disabled={saving}>
+                          {saving ? 'Saving...' : '✓ Save'}
+                        </button>
+                        <button className="btn-cancel" onClick={cancelEditing} disabled={saving}>✕ Cancel</button>
+                      </div>
+                      <div className="field-hint">⌘+Enter to save • Esc to cancel</div>
+                    </div>
+                  ) : (
+                    <div className="field-value">
+                      {typeof value === 'string' 
+                        ? (value.length > 150 ? value.substring(0, 150) + '...' : value)
+                        : JSON.stringify(value)}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
           </div>
         </div>
 
-        {/* URL Bar */}
-        <div className="preview-url-bar">
-          <input
-            type="text"
-            className="preview-url-input"
-            value={currentUrl}
-            onChange={(e) => setCurrentUrl(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                refreshPreview();
-              }
-            }}
-            placeholder="Enter preview URL..."
-          />
+        <div className="split-resizer" onMouseDown={(e) => {
+          e.preventDefault();
+          const startX = e.clientX;
+          const startPos = splitPosition;
+          const onMove = (ev) => {
+            const container = document.querySelector('.split-editor-main');
+            if (container) {
+              const delta = ev.clientX - startX;
+              const newPos = startPos + (delta / container.offsetWidth) * 100;
+              setSplitPosition(Math.min(70, Math.max(20, newPos)));
+            }
+          };
+          const onUp = () => {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+          };
+          document.addEventListener('mousemove', onMove);
+          document.addEventListener('mouseup', onUp);
+        }}>
+          <div className="resizer-handle"></div>
         </div>
 
-        {/* Iframe Container */}
-        <div className="preview-iframe-container">
-          {iframeLoading && (
-            <div className="iframe-loading-overlay">
-              <div className="loading-spinner"></div>
-              <p>Loading preview...</p>
-            </div>
-          )}
-          
-          {iframeError && (
-            <div className="iframe-error-overlay">
-              <div className="error-icon">⚠️</div>
-              <h3>Preview Not Available</h3>
-              <p>Make sure your site is running on:</p>
-              <code>{currentUrl}</code>
-              <button className="retry-btn" onClick={refreshPreview}>
-                ↻ Retry
-              </button>
-            </div>
-          )}
-          
-          <div 
-            className="preview-iframe-wrapper"
-            style={{ 
-              width: getIframeWidth(),
-              margin: viewportSize === 'desktop' ? '0' : '0 auto',
-              display: iframeError ? 'none' : 'block'
-            }}
-          >
-            <iframe
-              ref={iframeRef}
-              src={currentUrl}
-              className="preview-iframe"
-              title="Live Preview"
-              onLoad={handleIframeLoad}
-              onError={handleIframeError}
-              sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
+        <div className="preview-panel" style={{ width: `${100 - splitPosition}%` }}>
+          <div className="preview-url-bar">
+            <span className="url-icon">🌐</span>
+            <input
+              type="text"
+              className="url-input"
+              value={currentUrl}
+              onChange={(e) => setCurrentUrl(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && refreshPreview()}
+              placeholder="Enter preview URL..."
             />
+            <button onClick={refreshPreview} className="url-go-btn">Go</button>
+          </div>
+
+          <div className="preview-container">
+            {iframeLoading && (
+              <div className="preview-loading">
+                <div className="spinner"></div>
+                <p>Loading preview...</p>
+              </div>
+            )}
+            
+            <div className="preview-frame-wrapper" style={{ 
+              width: getViewportWidth(),
+              margin: viewportSize === 'desktop' ? '0' : '0 auto'
+            }}>
+              <iframe
+                ref={iframeRef}
+                src={currentUrl}
+                className="preview-frame"
+                title="Live Preview"
+                onLoad={() => setIframeLoading(false)}
+                onError={() => setIframeLoading(false)}
+              />
+            </div>
+
+            {viewportSize !== 'desktop' && (
+              <div className="viewport-label">
+                {viewportSize === 'mobile' ? '📱 Mobile 375px' : '📱 Tablet 768px'}
+              </div>
+            )}
           </div>
         </div>
       </div>

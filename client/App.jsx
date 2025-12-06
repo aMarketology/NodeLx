@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import HomePage from './components/HomePage';
 import ContentEditor from './components/ContentEditor';
+import SplitViewEditor from './components/SplitViewEditor';
+import TestSplitView from './components/TestSplitView';
 import './App.css';
 
 /**
@@ -12,6 +14,8 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
   const [highlightedElement, setHighlightedElement] = useState(null);
+  const [editorMode, setEditorMode] = useState(false);
+  const [editorConfig, setEditorConfig] = useState(null);
 
   useEffect(() => {
     loadContent();
@@ -110,6 +114,17 @@ function App() {
     }
   };
 
+  const handleLaunchEditor = (config) => {
+    console.log('Launching editor with config:', config);
+    setEditorConfig(config);
+    setEditorMode(true);
+  };
+
+  const handleBackToHome = () => {
+    setEditorMode(false);
+    setEditorConfig(null);
+  };
+
   if (loading) {
     return (
       <div className="loading-container">
@@ -130,13 +145,23 @@ function App() {
 
   return (
     <div className="app">
-      {/* Connection status indicator */}
-      <div className={`connection-status ${connected ? 'connected' : 'disconnected'}`}>
-        {connected ? '● Connected' : '○ Disconnected'}
-      </div>
+      {/* Show different views based on mode */}
+      {editorMode ? (
+        <SplitViewEditor 
+          previewUrl={editorConfig?.websiteUrl || 'http://localhost:3000'}
+          onBack={handleBackToHome}
+        />
+      ) : (
+        <>
+          {/* Connection status indicator */}
+          <div className={`connection-status ${connected ? 'connected' : 'disconnected'}`}>
+            {connected ? '● Connected' : '○ Disconnected'}
+          </div>
 
-      {/* Main content */}
-      <HomePage content={content} />
+          {/* Main content */}
+          <HomePage content={content} onLaunchEditor={handleLaunchEditor} />
+        </>
+      )}
     </div>
   );
 }
