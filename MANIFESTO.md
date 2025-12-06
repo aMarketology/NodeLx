@@ -13,6 +13,7 @@ Every developer has faced this nightmare:
 - You use a headless CMS → Lock yourself into their pricing/limits/opinions
 - You hard-code content → Become a glorified copy-paste assistant
 - You build custom admin panels → Waste weeks on CRUD boilerplate
+- You want to edit your own code visually → No tool exists for developers
 
 **There had to be a better way.**
 
@@ -36,24 +37,87 @@ Every developer has faced this nightmare:
 
 ---
 
+## 🔑 The Two Modes: Developer vs. Client
+
+NodeLx recognizes a fundamental truth: **Developers and clients have different needs.**
+
+### Developer Mode (Default)
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  🔓 DEVELOPER MODE - Full Power                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ✅ Edit text, images, content                                      │
+│  ✅ Add new elements to pages                                       │
+│  ✅ Change page structure                                           │
+│  ✅ Modify component props                                          │
+│  ✅ Access source code directly                                     │
+│  ✅ Create new pages and templates                                  │
+│  ✅ Full AST-based source code editing                              │
+│  ✅ Git integration for version control                             │
+│                                                                      │
+│  This is YOUR tool. No guardrails. Full control.                    │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Developer Mode is the default** because NodeLx is built for developers first. We don't hide complexity—we embrace it. You get:
+
+- **Direct source code editing** via Babel AST parsing
+- **File system access** to your project
+- **Git integration** for safe version control
+- **Full component manipulation** (add, remove, reorder)
+- **Live preview** of all changes
+
+### Client Mode (Restricted)
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  🔒 CLIENT MODE - Safe & Simple                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ✅ Edit text and images                                            │
+│  ✅ Change content in marked regions                                │
+│  ✅ Live preview of changes                                         │
+│  ✅ Simple, clean interface                                         │
+│                                                                      │
+│  ❌ Cannot add new elements                                         │
+│  ❌ Cannot change page structure                                    │
+│  ❌ Cannot access source code                                       │
+│  ❌ Cannot break the site layout                                    │
+│                                                                      │
+│  Safe for clients. They edit content, you control structure.        │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Client Mode** is what you share with clients. It uses the **content layer separation** pattern:
+- Content stored in JSON files (or database)
+- Clients only see editable fields
+- Structure is locked—they can't break anything
+- Changes are isolated from source code
+
+---
+
 ## 🏗️ What NodeLx Is
 
 ### A Visual Layer Over Your Codebase
 
-NodeLx is **not** a traditional CMS. It's a **content editing interface** that:
+NodeLx is **not** a traditional CMS. It's a **dual-mode editing interface** that:
 
-1. **Reads your React/JSX components** as they are
-2. **Extracts editable regions** you define
-3. **Provides a visual editor** for non-technical users
-4. **Saves changes separately** from your codebase
-5. **Syncs in real-time** via WebSocket
-6. **Gets out of your way** when you don't need it
+1. **Developer Mode (Default)**: Full source code editing via AST parsing
+2. **Client Mode**: Safe content editing via JSON layer
+3. **Reads your React/JSX components** as they are
+4. **Extracts editable regions** you define
+5. **Provides visual editing** with live preview
+6. **Saves changes** to source files OR content layer
+7. **Syncs in real-time** via WebSocket
+8. **Gets out of your way** when you don't need it
 
 ### Think of it as:
-- **VS Code** for developers
+- **VS Code in the browser** for developers
 - **Squarespace** for clients
 - **Both** at the same time
-- **Neither** gets in the other's way
+- **Switch modes** based on who's using it
 
 ---
 
@@ -114,29 +178,33 @@ NodeLx is a **sidecar**, not a **framework**.
 
 ## 🚀 What NodeLx Does
 
-### For Developers
+### For Developers (Developer Mode - Default)
 
-✅ **Full Control**: Write components however you want  
-✅ **Live Preview**: Cursor position → highlighted element in preview  
-✅ **Source Mapping**: AST parsing links code to DOM  
-✅ **Hot Reload**: File changes trigger instant updates  
-✅ **WebSocket Sync**: Real-time connection to editor  
-✅ **JSON Content**: Simple, portable, database-ready  
-✅ **No Vendor Lock-in**: Works with React, Next.js, anything JSX  
+✅ **Full Source Code Editing**: Modify JSX files directly via AST  
+✅ **Add/Remove Elements**: Insert new components, delete old ones  
+✅ **Change Structure**: Reorder, nest, restructure pages  
+✅ **Live Preview**: See changes as you make them  
+✅ **Git Integration**: Every change tracked in version control  
+✅ **No Abstraction Penalty**: Your code runs exactly as written  
+✅ **WebSocket Sync**: Real-time updates across all clients  
+✅ **Monaco Editor**: Full VS Code editing experience in browser  
 
-### For Clients
+### For Clients (Client Mode)
 
-✅ **Visual Editor**: Split-view interface with live preview  
+✅ **Visual Editor**: Simple form-based content editing  
 ✅ **Locked Down**: Can't see or break code  
 ✅ **Point & Click**: Edit text, images, links inline  
 ✅ **Instant Preview**: See changes before saving  
 ✅ **Responsive Views**: Mobile/tablet/desktop preview modes  
 ✅ **No Training Needed**: Familiar CMS-like interface  
+✅ **Can't Break Layouts**: Structure is protected  
 
 ### For Projects
 
-✅ **Content/Code Separation**: Clients edit content, devs control structure  
-✅ **Version Control Ready**: JSON files commit nicely  
+✅ **Dual-Mode Architecture**: Developer power + client safety  
+✅ **Content/Code Separation**: When you need it (Client Mode)  
+✅ **Direct Code Access**: When you want it (Developer Mode)  
+✅ **Version Control Ready**: Git integration built-in  
 ✅ **Database Migration Path**: Start local, move to Supabase/Postgres  
 ✅ **Multi-Environment**: Dev uses files, prod uses DB  
 ✅ **Collaboration**: Multiple editors, real-time sync  
@@ -154,9 +222,26 @@ NodeLx is a **sidecar**, not a **framework**.
 - [x] Responsive preview modes
 - [x] Debug console
 
-### Phase 2: Visual Editing
+### Phase 2: Dual-Mode Architecture
+- [ ] **Developer Mode (Default)**
+  - [ ] Full AST-based source code editing
+  - [ ] Add/remove elements in JSX
+  - [ ] Change component structure
+  - [ ] Monaco Editor integration
+  - [ ] Git integration (commit, branch, diff)
+  - [ ] File tree navigation
+  - [ ] Component props editing
+- [ ] **Client Mode**
+  - [ ] Content layer separation (JSON)
+  - [ ] Simple form-based editing
+  - [ ] Locked structure (read-only layout)
+  - [ ] Image upload only (no code access)
+  - [ ] Mode toggle with password protection
+
+### Phase 3: Visual Editing
 - [ ] Click-to-edit on iframe elements
-- [ ] Drag-to-reorder components
+- [ ] Drag-to-reorder components (Developer Mode)
+- [ ] Add new components from library (Developer Mode)
 - [ ] Visual image cropping
 - [ ] Link picker with preview
 - [ ] Rich text editor (markdown-based)
@@ -260,11 +345,19 @@ NodeLx is a **sidecar**, not a **framework**.
 <img data-editable="banner" src={content.banner} />
 ```
 
-### 5. **Client Safety**
+### 5. **Client Safety (Client Mode)**
 - Clients can't see code
 - Clients can't break layouts
 - Clients can't create pages (unless you allow it)
 - Clients can only edit what you mark as editable
+- Content changes never touch source files
+
+### 6. **Developer Power (Developer Mode)**
+- Full access to source code
+- Add, remove, reorder any element
+- Direct AST manipulation
+- Git integration for every change
+- No restrictions, no guardrails
 
 ---
 

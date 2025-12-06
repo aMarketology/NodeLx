@@ -36,11 +36,162 @@
 
 ---
 
+## 🔑 Dual-Mode Architecture
+
+NodeLx operates in two distinct modes:
+
+### Developer Mode (Default) 🔓
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  DEVELOPER MODE - Full Source Code Editing                          │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  How it works:                                                       │
+│  1. NodeLx reads your JSX/TSX files                                 │
+│  2. Parses them into AST (Abstract Syntax Tree)                     │
+│  3. You edit visually OR in Monaco Editor                           │
+│  4. Changes write back to actual source files                       │
+│  5. Git tracks all changes                                           │
+│                                                                      │
+│  Capabilities:                                                       │
+│  ✅ Edit text content directly in source                            │
+│  ✅ Add new elements (buttons, sections, images)                    │
+│  ✅ Remove elements                                                  │
+│  ✅ Reorder/restructure components                                  │
+│  ✅ Modify component props                                          │
+│  ✅ Full Monaco code editor access                                  │
+│  ✅ Git commit/branch/diff integration                              │
+│  ✅ File tree navigation                                            │
+│                                                                      │
+│  Target User: Developers                                            │
+│  This is the DEFAULT mode                                           │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Client Mode 🔒
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  CLIENT MODE - Safe Content Layer Editing                           │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  How it works:                                                       │
+│  1. Content stored in JSON files (content/*.json)                   │
+│  2. Your code reads from: {content.heroTitle}                       │
+│  3. Client edits JSON via simple form interface                     │
+│  4. Source code files are NEVER modified                            │
+│  5. Structure is locked, only content changes                       │
+│                                                                      │
+│  Capabilities:                                                       │
+│  ✅ Edit text in marked regions                                     │
+│  ✅ Upload/change images                                            │
+│  ✅ Live preview of changes                                         │
+│  ✅ Simple form-based UI                                            │
+│                                                                      │
+│  Restrictions:                                                       │
+│  ❌ Cannot add new elements                                         │
+│  ❌ Cannot change structure                                         │
+│  ❌ Cannot see or access source code                                │
+│  ❌ Cannot break the site                                           │
+│                                                                      │
+│  Target User: Clients, marketers, non-technical editors             │
+│  Activated via: Mode toggle (password protected)                    │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Mode Comparison
+
+| Feature | Developer Mode | Client Mode |
+|---------|---------------|-------------|
+| **Default** | ✅ Yes | No |
+| **Edit text** | ✅ Source code | ✅ JSON layer |
+| **Add elements** | ✅ Yes | ❌ No |
+| **Remove elements** | ✅ Yes | ❌ No |
+| **Change structure** | ✅ Yes | ❌ No |
+| **See source code** | ✅ Yes | ❌ No |
+| **Git integration** | ✅ Yes | ❌ No |
+| **Can break site** | ⚠️ Possible | ❌ Impossible |
+| **Target user** | Developers | Clients |
+
+---
+
 ## 🚀 Immediate Next Steps (Next 2 Weeks)
 
-### Priority 1: Core Stability
+### Priority 1: Dual-Mode Implementation
 
-#### 1.1 Error Handling & Validation
+#### 1.0 Developer Mode - Source Code Editing (DEFAULT)
+**Why**: This is our core differentiator - developers can edit actual source code visually  
+**Impact**: Game-changer for developer workflows
+
+**Tasks:**
+- [ ] Create `CodeEditor` service for file system access
+- [ ] Implement AST-based element detection
+- [ ] Build Monaco Editor integration
+- [ ] Add element insertion UI (add button, section, etc.)
+- [ ] Add element deletion with confirmation
+- [ ] Implement element reordering (drag-and-drop)
+- [ ] Git integration (auto-commit on save, branch support)
+- [ ] File tree sidebar for navigation
+
+**New files to create:**
+```
+server/
+  ├── codeEditor.js         # File system operations
+  ├── astParser.js          # Babel AST parsing & manipulation
+  └── gitIntegration.js     # Git operations
+
+client/editor/
+  ├── DeveloperMode.jsx     # Developer mode container
+  ├── MonacoEditor.jsx      # VS Code editor component
+  ├── FileTree.jsx          # Project file navigation
+  ├── ElementInserter.jsx   # Add new elements UI
+  ├── ComponentLibrary.jsx  # Draggable component palette
+  └── GitPanel.jsx          # Commit/branch UI
+```
+
+**API endpoints:**
+```
+GET    /api/files/:path      - Read file content
+PUT    /api/files/:path      - Write file content
+POST   /api/ast/insert       - Insert element via AST
+DELETE /api/ast/remove       - Remove element via AST
+POST   /api/ast/reorder      - Reorder elements via AST
+GET    /api/git/status       - Git status
+POST   /api/git/commit       - Commit changes
+```
+
+**Estimated Time:** 10-12 days
+
+---
+
+#### 1.1 Client Mode - Content Layer Separation
+**Why**: Safe editing for non-developers  
+**Impact**: Client handoff without risk
+
+**Tasks:**
+- [ ] Create `ClientMode` component with restricted UI
+- [ ] Content layer (JSON) editing only
+- [ ] Hide all code-related features
+- [ ] Mode switcher with password protection
+- [ ] Simpler UI with only essential fields
+- [ ] Lock structure modifications
+
+**New files:**
+```
+client/editor/
+  ├── ClientMode.jsx        # Client mode container
+  ├── ContentEditor.jsx     # Simple form-based editor
+  └── ModeSwitcher.jsx      # Toggle between modes
+```
+
+**Estimated Time:** 4-5 days
+
+---
+
+### Priority 2: Core Stability
+
+#### 2.1 Error Handling & Validation
 **Why**: Currently, invalid JSON or missing files can crash the server  
 **Impact**: Production-ready stability
 
@@ -62,7 +213,7 @@
 
 ---
 
-#### 1.2 Testing Infrastructure
+#### 2.2 Testing Infrastructure
 **Why**: No tests = fragile codebase  
 **Impact**: Confidence in changes, easier contributions
 
@@ -86,7 +237,7 @@
 
 ---
 
-#### 1.3 Configuration Management
+#### 2.3 Configuration Management
 **Why**: Hard-coded ports and paths make deployment difficult  
 **Impact**: Easier deployment, multi-environment support
 
@@ -112,9 +263,9 @@ config/
 
 ---
 
-### Priority 2: Developer Experience
+### Priority 3: Developer Experience
 
-#### 2.1 CLI Tool
+#### 3.1 CLI Tool
 **Why**: Manual setup is tedious  
 **Impact**: Faster onboarding, better first impression
 
@@ -153,7 +304,7 @@ cli/
 
 ---
 
-#### 2.2 Better Documentation
+#### 3.2 Better Documentation
 **Why**: Developers need clear examples and guides  
 **Impact**: More adoption, fewer support questions
 
@@ -647,21 +798,29 @@ CREATE TABLE versions (
 
 ## 🎯 Immediate Action Items (This Week)
 
-### Day 1-2: Foundation
-- [ ] Set up testing framework (Jest + Vitest)
-- [ ] Write first 10 tests for ContentStore
-- [ ] Add error handling to API endpoints
+### Day 1-2: Developer Mode Foundation
+- [ ] Create `server/codeEditor.js` for file read/write
+- [ ] Create `server/astParser.js` for Babel AST manipulation
+- [ ] Add `/api/files/:path` endpoints (GET, PUT)
+- [ ] Test reading and writing JSX files
 
-### Day 3-4: Developer Experience
-- [ ] Create `.env.example`
-- [ ] Add configuration management
-- [ ] Update README with clear setup steps
+### Day 3-4: AST Element Manipulation
+- [ ] Implement `insertElement()` in astParser
+- [ ] Implement `removeElement()` in astParser
+- [ ] Implement `reorderElements()` in astParser
+- [ ] Add API endpoints for AST operations
 
-### Day 5-7: Documentation
-- [ ] Write CONTRIBUTING.md
-- [ ] Write API_REFERENCE.md
-- [ ] Record 5-minute demo video
-- [ ] Post to Reddit/HackerNews for feedback
+### Day 5-6: Monaco Editor Integration
+- [ ] Install `@monaco-editor/react`
+- [ ] Create `MonacoEditor.jsx` component
+- [ ] Wire up to file read/write APIs
+- [ ] Add syntax highlighting for JSX/TSX
+
+### Day 7: Mode Switcher & Client Mode
+- [ ] Create `ModeSwitcher.jsx` component
+- [ ] Create `ClientMode.jsx` with restricted UI
+- [ ] Add mode state management
+- [ ] Password protection for mode switching
 
 ---
 
