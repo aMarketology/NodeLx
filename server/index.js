@@ -5,10 +5,13 @@ const cors = require('cors');
 const ContentStore = require('./contentStore');
 const WebSocketServer = require('./websocket');
 const SourceMapper = require('./sourceMap');
+const CodeEditor = require('./codeEditor');
+const ast = require('./ast');
+const themeManager = require('./themeManager');
 
 /**
  * NodeLx Development Server
- * Provides content management, live preview, and source mapping
+ * Provides content management, live preview, source mapping, and code editing
  */
 class NodeLxServer {
   constructor(options = {}) {
@@ -20,6 +23,7 @@ class NodeLxServer {
     this.contentStore = new ContentStore('./content');
     this.wsServer = new WebSocketServer(this.server);
     this.sourceMapper = new SourceMapper('./client/components');
+    this.codeEditor = new CodeEditor(); // Will be configured per-request
   }
 
   async initialize() {
@@ -116,17 +120,763 @@ class NodeLxServer {
       const elements = await this.sourceMapper.parseFile(filename);
       res.json({ filename, elements });
     });
+
+    // ========================================
+    // FILE SYSTEM API (Developer Mode)
+    // ========================================
+
+    // Set project path for code editing
+    this.app.post('/api/project/set-path', (req, res) => {
+      try {
+        const { projectPath } = req.body;
+        
+        if (!projectPath) {
+          return res.status(400).json({ error: 'projectPath is required' });
+        }
+
+        this.codeEditor.setProjectPath(projectPath);
+        res.json({ 
+          success: true, 
+          projectPath: this.codeEditor.projectPath 
+        });
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // Get current project path
+    this.app.get('/api/project/path', (req, res) => {
+      res.json({ 
+        projectPath: this.codeEditor.projectPath 
+      });
+    });
+
+    // Get file tree structure
+    this.app.get('/api/files/tree', async (req, res) => {
+      try {
+        const tree = await this.codeEditor.getFileTree();
+        res.json(tree);
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // List files in a directory
+    this.app.get('/api/files/list', async (req, res) => {
+      try {
+        const { path: dirPath = '', recursive = 'true' } = req.query;
+        const files = await this.codeEditor.listFiles(dirPath, recursive === 'true');
+        res.json({ files });
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // Read a file
+    this.app.get('/api/files/*', async (req, res) => {
+      try {
+        // Extract path after /api/files/
+        const filePath = req.params[0];
+        
+        if (!filePath) {
+          return res.status(400).json({ error: 'File path is required' });
+        }
+
+        const file = await this.codeEditor.readFile(filePath);
+        res.json(file);
+      } catch (error) {
+        if (error.message.includes('not found')) {
+          return res.status(404).json({ error: error.message });
+        }
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // Write/Update a file
+    this.app.put('/api/files/*', async (req, res) => {
+      try {
+        const filePath = req.params[0];
+        const { content, createBackup = true } = req.body;
+        
+        if (!filePath) {
+          return res.status(400).json({ error: 'File path is required' });
+        }
+        
+        if (content === undefined) {
+          return res.status(400).json({ error: 'content is required' });
+        }
+
+        const result = await this.codeEditor.writeFile(filePath, content, createBackup);
+        
+        // Notify WebSocket clients of file change
+        this.wsServer.broadcast({
+          type: 'file-changed',
+          path: filePath,
+          timestamp: new Date().toISOString()
+        });
+
+        res.json(result);
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // Create a new file
+    this.app.post('/api/files/*', async (req, res) => {
+      try {
+        const filePath = req.params[0];
+        const { content = '' } = req.body;
+        
+        if (!filePath) {
+          return res.status(400).json({ error: 'File path is required' });
+        }
+
+        const result = await this.codeEditor.createFile(filePath, content);
+        
+        // Notify WebSocket clients
+        this.wsServer.broadcast({
+          type: 'file-created',
+          path: filePath,
+          timestamp: new Date().toISOString()
+        });
+
+        res.json(result);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          return res.status(409).json({ error: error.message });
+        }
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // Delete a file
+    this.app.delete('/api/files/*', async (req, res) => {
+      try {
+        const filePath = req.params[0];
+        
+        if (!filePath) {
+          return res.status(400).json({ error: 'File path is required' });
+        }
+
+        const result = await this.codeEditor.deleteFile(filePath);
+        
+        // Notify WebSocket clients
+        this.wsServer.broadcast({
+          type: 'file-deleted',
+          path: filePath,
+          timestamp: new Date().toISOString()
+        });
+
+        res.json(result);
+      } catch (error) {
+        if (error.message.includes('not found')) {
+          return res.status(404).json({ error: error.message });
+        }
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // Rename/move a file
+    this.app.patch('/api/files/rename', async (req, res) => {
+      try {
+        const { oldPath, newPath } = req.body;
+        
+        if (!oldPath || !newPath) {
+          return res.status(400).json({ error: 'oldPath and newPath are required' });
+        }
+
+        const result = await this.codeEditor.renameFile(oldPath, newPath);
+        
+        // Notify WebSocket clients
+        this.wsServer.broadcast({
+          type: 'file-renamed',
+          oldPath,
+          newPath,
+          timestamp: new Date().toISOString()
+        });
+
+        res.json(result);
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // ========================================
+    // AST API (Code Manipulation)
+    // ========================================
+
+    // Get all editable elements in a file
+    this.app.get('/api/ast/editable/*', async (req, res) => {
+      try {
+        const filePath = req.params[0];
+        const fullPath = path.resolve(this.codeEditor.projectPath, filePath);
+        
+        const result = await ast.manager.findAllEditable(fullPath);
+        res.json(result);
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // List available element templates
+    this.app.get('/api/ast/templates', (req, res) => {
+      res.json({
+        templates: ast.templates.list()
+      });
+    });
+
+    // Insert element after target
+    this.app.post('/api/ast/insert/after', async (req, res) => {
+      try {
+        const { filePath, targetId, element, options = {} } = req.body;
+        
+        if (!filePath || !targetId || !element) {
+          return res.status(400).json({ 
+            error: 'filePath, targetId, and element are required' 
+          });
+        }
+
+        const fullPath = path.resolve(this.codeEditor.projectPath, filePath);
+        const result = await ast.manager.insertAfter(fullPath, targetId, element, options);
+        
+        if (result.success) {
+          this.wsServer.broadcast({
+            type: 'ast-modified',
+            operation: 'insert',
+            filePath,
+            targetId,
+            timestamp: new Date().toISOString()
+          });
+        }
+        
+        res.json(result);
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // Insert element before target
+    this.app.post('/api/ast/insert/before', async (req, res) => {
+      try {
+        const { filePath, targetId, element, options = {} } = req.body;
+        
+        if (!filePath || !targetId || !element) {
+          return res.status(400).json({ 
+            error: 'filePath, targetId, and element are required' 
+          });
+        }
+
+        const fullPath = path.resolve(this.codeEditor.projectPath, filePath);
+        const result = await ast.manager.insertBefore(fullPath, targetId, element, options);
+        
+        if (result.success) {
+          this.wsServer.broadcast({
+            type: 'ast-modified',
+            operation: 'insert',
+            filePath,
+            targetId,
+            timestamp: new Date().toISOString()
+          });
+        }
+        
+        res.json(result);
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // Remove element
+    this.app.delete('/api/ast/element', async (req, res) => {
+      try {
+        const { filePath, targetId, options = {} } = req.body;
+        
+        if (!filePath || !targetId) {
+          return res.status(400).json({ 
+            error: 'filePath and targetId are required' 
+          });
+        }
+
+        const fullPath = path.resolve(this.codeEditor.projectPath, filePath);
+        const result = await ast.manager.removeElement(fullPath, targetId, options);
+        
+        if (result.success) {
+          this.wsServer.broadcast({
+            type: 'ast-modified',
+            operation: 'remove',
+            filePath,
+            targetId,
+            timestamp: new Date().toISOString()
+          });
+        }
+        
+        res.json(result);
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // Update element text
+    this.app.patch('/api/ast/text', async (req, res) => {
+      try {
+        const { filePath, targetId, text } = req.body;
+        
+        if (!filePath || !targetId || text === undefined) {
+          return res.status(400).json({ 
+            error: 'filePath, targetId, and text are required' 
+          });
+        }
+
+        const fullPath = path.resolve(this.codeEditor.projectPath, filePath);
+        const result = await ast.manager.updateText(fullPath, targetId, text);
+        
+        if (result.success) {
+          this.wsServer.broadcast({
+            type: 'ast-modified',
+            operation: 'update-text',
+            filePath,
+            targetId,
+            timestamp: new Date().toISOString()
+          });
+        }
+        
+        res.json(result);
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // Update element attribute
+    this.app.patch('/api/ast/attribute', async (req, res) => {
+      try {
+        const { filePath, targetId, attribute, value } = req.body;
+        
+        if (!filePath || !targetId || !attribute) {
+          return res.status(400).json({ 
+            error: 'filePath, targetId, and attribute are required' 
+          });
+        }
+
+        const fullPath = path.resolve(this.codeEditor.projectPath, filePath);
+        const result = await ast.manager.updateAttribute(fullPath, targetId, attribute, value);
+        
+        if (result.success) {
+          this.wsServer.broadcast({
+            type: 'ast-modified',
+            operation: 'update-attribute',
+            filePath,
+            targetId,
+            timestamp: new Date().toISOString()
+          });
+        }
+        
+        res.json(result);
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // Move element up
+    this.app.post('/api/ast/move/up', async (req, res) => {
+      try {
+        const { filePath, targetId } = req.body;
+        
+        if (!filePath || !targetId) {
+          return res.status(400).json({ 
+            error: 'filePath and targetId are required' 
+          });
+        }
+
+        const fullPath = path.resolve(this.codeEditor.projectPath, filePath);
+        const result = await ast.manager.moveUp(fullPath, targetId);
+        
+        if (result.success) {
+          this.wsServer.broadcast({
+            type: 'ast-modified',
+            operation: 'move',
+            filePath,
+            targetId,
+            timestamp: new Date().toISOString()
+          });
+        }
+        
+        res.json(result);
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // Move element down
+    this.app.post('/api/ast/move/down', async (req, res) => {
+      try {
+        const { filePath, targetId } = req.body;
+        
+        if (!filePath || !targetId) {
+          return res.status(400).json({ 
+            error: 'filePath and targetId are required' 
+          });
+        }
+
+        const fullPath = path.resolve(this.codeEditor.projectPath, filePath);
+        const result = await ast.manager.moveDown(fullPath, targetId);
+        
+        if (result.success) {
+          this.wsServer.broadcast({
+            type: 'ast-modified',
+            operation: 'move',
+            filePath,
+            targetId,
+            timestamp: new Date().toISOString()
+          });
+        }
+        
+        res.json(result);
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // ========================================
+    // STYLE API (Element Styling)
+    // ========================================
+
+    // Update element spacing (margin/padding)
+    this.app.patch('/api/ast/spacing', async (req, res) => {
+      try {
+        const { filePath, targetId, spacingType, value } = req.body;
+        
+        if (!filePath || !targetId || !spacingType) {
+          return res.status(400).json({ 
+            error: 'filePath, targetId, and spacingType are required' 
+          });
+        }
+
+        const fullPath = path.resolve(this.codeEditor.projectPath, filePath);
+        const result = await ast.manager.updateSpacing(fullPath, targetId, spacingType, value);
+        
+        if (result.success) {
+          this.wsServer.broadcast({
+            type: 'ast-modified',
+            operation: 'update-spacing',
+            filePath,
+            targetId,
+            timestamp: new Date().toISOString()
+          });
+        }
+        
+        res.json(result);
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // Update element inline styles
+    this.app.patch('/api/ast/style', async (req, res) => {
+      try {
+        const { filePath, targetId, styles } = req.body;
+        
+        if (!filePath || !targetId || !styles) {
+          return res.status(400).json({ 
+            error: 'filePath, targetId, and styles are required' 
+          });
+        }
+
+        const fullPath = path.resolve(this.codeEditor.projectPath, filePath);
+        const result = await ast.manager.updateStyle(fullPath, targetId, styles);
+        
+        if (result.success) {
+          this.wsServer.broadcast({
+            type: 'ast-modified',
+            operation: 'update-style',
+            filePath,
+            targetId,
+            timestamp: new Date().toISOString()
+          });
+        }
+        
+        res.json(result);
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // Get element styles
+    this.app.get('/api/ast/style/:targetId', async (req, res) => {
+      try {
+        const { targetId } = req.params;
+        const { filePath } = req.query;
+        
+        if (!filePath) {
+          return res.status(400).json({ error: 'filePath query param is required' });
+        }
+
+        const fullPath = path.resolve(this.codeEditor.projectPath, filePath);
+        const result = await ast.manager.getStyles(fullPath, targetId);
+        
+        res.json(result);
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // Add CSS class to element
+    this.app.post('/api/ast/class', async (req, res) => {
+      try {
+        const { filePath, targetId, className } = req.body;
+        
+        if (!filePath || !targetId || !className) {
+          return res.status(400).json({ 
+            error: 'filePath, targetId, and className are required' 
+          });
+        }
+
+        const fullPath = path.resolve(this.codeEditor.projectPath, filePath);
+        const result = await ast.manager.addClassName(fullPath, targetId, className);
+        
+        if (result.success) {
+          this.wsServer.broadcast({
+            type: 'ast-modified',
+            operation: 'add-class',
+            filePath,
+            targetId,
+            timestamp: new Date().toISOString()
+          });
+        }
+        
+        res.json(result);
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // Remove CSS class from element
+    this.app.delete('/api/ast/class', async (req, res) => {
+      try {
+        const { filePath, targetId, className } = req.body;
+        
+        if (!filePath || !targetId || !className) {
+          return res.status(400).json({ 
+            error: 'filePath, targetId, and className are required' 
+          });
+        }
+
+        const fullPath = path.resolve(this.codeEditor.projectPath, filePath);
+        const result = await ast.manager.removeClassName(fullPath, targetId, className);
+        
+        if (result.success) {
+          this.wsServer.broadcast({
+            type: 'ast-modified',
+            operation: 'remove-class',
+            filePath,
+            targetId,
+            timestamp: new Date().toISOString()
+          });
+        }
+        
+        res.json(result);
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // ========================================
+    // THEME API (Global Typography & Styles)
+    // ========================================
+
+    // Get full theme
+    this.app.get('/api/theme', async (req, res) => {
+      try {
+        const theme = await themeManager.getTheme();
+        res.json(theme);
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // Update entire theme
+    this.app.put('/api/theme', async (req, res) => {
+      try {
+        const theme = await themeManager.updateTheme(req.body);
+        
+        this.wsServer.broadcast({
+          type: 'theme-changed',
+          timestamp: new Date().toISOString()
+        });
+        
+        res.json(theme);
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // Get typography settings
+    this.app.get('/api/theme/typography', async (req, res) => {
+      try {
+        const typography = await themeManager.getTypography();
+        res.json(typography);
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // Update typography for specific element (h1, h2, p, etc.)
+    this.app.patch('/api/theme/typography/:element', async (req, res) => {
+      try {
+        const { element } = req.params;
+        const settings = req.body;
+        
+        const theme = await themeManager.updateTypography(element, settings);
+        
+        this.wsServer.broadcast({
+          type: 'theme-changed',
+          element,
+          timestamp: new Date().toISOString()
+        });
+        
+        res.json(theme.typography[element]);
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // Get color palette
+    this.app.get('/api/theme/colors', async (req, res) => {
+      try {
+        const colors = await themeManager.getColors();
+        res.json(colors);
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // Update colors
+    this.app.patch('/api/theme/colors', async (req, res) => {
+      try {
+        const theme = await themeManager.updateColors(req.body);
+        
+        this.wsServer.broadcast({
+          type: 'theme-changed',
+          timestamp: new Date().toISOString()
+        });
+        
+        res.json(theme.colors);
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // Get generated CSS from theme
+    this.app.get('/api/theme/css', async (req, res) => {
+      try {
+        const css = await themeManager.generateCSS();
+        res.type('text/css').send(css);
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // Add Google Font
+    this.app.post('/api/theme/fonts', async (req, res) => {
+      try {
+        const { fontName } = req.body;
+        
+        if (!fontName) {
+          return res.status(400).json({ error: 'fontName is required' });
+        }
+
+        const theme = await themeManager.addGoogleFont(fontName);
+        
+        this.wsServer.broadcast({
+          type: 'theme-changed',
+          timestamp: new Date().toISOString()
+        });
+        
+        res.json({ googleFonts: theme.googleFonts });
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // Remove Google Font
+    this.app.delete('/api/theme/fonts', async (req, res) => {
+      try {
+        const { fontName } = req.body;
+        
+        if (!fontName) {
+          return res.status(400).json({ error: 'fontName is required' });
+        }
+
+        const theme = await themeManager.removeGoogleFont(fontName);
+        
+        this.wsServer.broadcast({
+          type: 'theme-changed',
+          timestamp: new Date().toISOString()
+        });
+        
+        res.json({ googleFonts: theme.googleFonts });
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // Get Google Fonts link tags
+    this.app.get('/api/theme/fonts/link', async (req, res) => {
+      try {
+        const link = await themeManager.generateGoogleFontsLink();
+        res.json({ link });
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
+
+    // Get popular font suggestions
+    this.app.get('/api/theme/fonts/popular', (req, res) => {
+      res.json(themeManager.POPULAR_FONTS);
+    });
+
+    // Reset theme to defaults
+    this.app.post('/api/theme/reset', async (req, res) => {
+      try {
+        const theme = await themeManager.resetTheme();
+        
+        this.wsServer.broadcast({
+          type: 'theme-reset',
+          timestamp: new Date().toISOString()
+        });
+        
+        res.json(theme);
+      } catch (error) {
+        res.status(400).json({ error: error.message });
+      }
+    });
   }
 
   start() {
     this.server.listen(this.port, () => {
-      console.log('\n=================================');
+      console.log('\n==========================================');
       console.log('🚀 NodeLx Development Server');
-      console.log('=================================');
+      console.log('==========================================');
       console.log(`Server running at: http://localhost:${this.port}`);
       console.log(`Content Store: ${this.contentStore.store.size} pages loaded`);
       console.log(`Source Mapper: ${this.sourceMapper.sourceMap.size} components mapped`);
-      console.log('=================================\n');
+      console.log(`Code Editor: Ready (Developer Mode)`);
+      console.log(`AST Parser: Ready`);
+      console.log(`Theme Manager: Ready`);
+      console.log('==========================================');
+      console.log('API Endpoints:');
+      console.log('  Content:  GET/PATCH /api/content/:pageId');
+      console.log('  Files:    GET/PUT/POST/DELETE /api/files/*');
+      console.log('  Tree:     GET /api/files/tree');
+      console.log('  AST:      POST /api/ast/insert/after|before');
+      console.log('            DELETE /api/ast/element');
+      console.log('            PATCH /api/ast/text|attribute|spacing|style');
+      console.log('            POST /api/ast/move/up|down');
+      console.log('            POST|DELETE /api/ast/class');
+      console.log('  Theme:    GET/PUT /api/theme');
+      console.log('            GET/PATCH /api/theme/typography/:element');
+      console.log('            GET/PATCH /api/theme/colors');
+      console.log('            GET /api/theme/css');
+      console.log('            POST|DELETE /api/theme/fonts');
+      console.log('==========================================\n');
     });
   }
 
