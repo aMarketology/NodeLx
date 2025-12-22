@@ -173,13 +173,12 @@ class NodeLxServer {
     });
 
     // Read a file
-    this.app.get('/api/files/*', async (req, res) => {
+    this.app.get('/api/files/read', async (req, res) => {
       try {
-        // Extract path after /api/files/
-        const filePath = req.params[0];
+        const filePath = req.query.path;
         
         if (!filePath) {
-          return res.status(400).json({ error: 'File path is required' });
+          return res.status(400).json({ error: 'File path is required (use ?path=...)' });
         }
 
         const file = await this.codeEditor.readFile(filePath);
@@ -193,10 +192,9 @@ class NodeLxServer {
     });
 
     // Write/Update a file
-    this.app.put('/api/files/*', async (req, res) => {
+    this.app.put('/api/files/write', async (req, res) => {
       try {
-        const filePath = req.params[0];
-        const { content, createBackup = true } = req.body;
+        const { path: filePath, content, createBackup = true } = req.body;
         
         if (!filePath) {
           return res.status(400).json({ error: 'File path is required' });
@@ -222,10 +220,9 @@ class NodeLxServer {
     });
 
     // Create a new file
-    this.app.post('/api/files/*', async (req, res) => {
+    this.app.post('/api/files/create', async (req, res) => {
       try {
-        const filePath = req.params[0];
-        const { content = '' } = req.body;
+        const { path: filePath, content = '' } = req.body;
         
         if (!filePath) {
           return res.status(400).json({ error: 'File path is required' });
@@ -250,9 +247,9 @@ class NodeLxServer {
     });
 
     // Delete a file
-    this.app.delete('/api/files/*', async (req, res) => {
+    this.app.delete('/api/files/delete', async (req, res) => {
       try {
-        const filePath = req.params[0];
+        const { path: filePath } = req.body;
         
         if (!filePath) {
           return res.status(400).json({ error: 'File path is required' });
@@ -306,9 +303,14 @@ class NodeLxServer {
     // ========================================
 
     // Get all editable elements in a file
-    this.app.get('/api/ast/editable/*', async (req, res) => {
+    this.app.get('/api/ast/editable', async (req, res) => {
       try {
-        const filePath = req.params[0];
+        const filePath = req.query.path;
+        
+        if (!filePath) {
+          return res.status(400).json({ error: 'File path is required (use ?path=...)' });
+        }
+        
         const fullPath = path.resolve(this.codeEditor.projectPath, filePath);
         
         const result = await ast.manager.findAllEditable(fullPath);

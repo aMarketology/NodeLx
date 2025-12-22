@@ -3,6 +3,7 @@ import HomePage from './components/HomePage';
 import ContentEditor from './components/ContentEditor';
 import SplitViewEditor from './components/SplitViewEditor';
 import TestSplitView from './components/TestSplitView';
+import VisualEditor from './editor/VisualEditor';
 import './App.css';
 
 /**
@@ -14,8 +15,11 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
   const [highlightedElement, setHighlightedElement] = useState(null);
-  const [editorMode, setEditorMode] = useState(false);
-  const [editorConfig, setEditorConfig] = useState(null);
+  const [editorMode, setEditorMode] = useState('visual'); // 'home', 'split', 'visual'
+  const [editorConfig, setEditorConfig] = useState({
+    websiteUrl: 'http://localhost:3000',
+    projectPath: '/Users/thelegendofzjui/Documents/GitHub/FireUp'
+  });
 
   useEffect(() => {
     loadContent();
@@ -146,7 +150,12 @@ function App() {
   return (
     <div className="app">
       {/* Show different views based on mode */}
-      {editorMode ? (
+      {editorMode === 'visual' ? (
+        <VisualEditor 
+          targetUrl={editorConfig?.websiteUrl || 'http://localhost:3000'}
+          projectPath={editorConfig?.projectPath}
+        />
+      ) : editorMode === 'split' ? (
         <SplitViewEditor 
           previewUrl={editorConfig?.websiteUrl || 'http://localhost:3000'}
           onBack={handleBackToHome}
