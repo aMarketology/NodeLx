@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { getServerUrl } from '../config';
 import './SplitViewEditor.css';
 
 function SplitViewEditor({ 
@@ -20,7 +21,7 @@ function SplitViewEditor({
   const [splitPosition, setSplitPosition] = useState(35);
   
   const iframeRef = useRef(null);
-  const API_URL = 'http://localhost:3001';
+  const API_URL = getServerUrl();
 
   useEffect(() => {
     console.log('[SplitViewEditor] Mounting with pageId:', pageId);

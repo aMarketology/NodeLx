@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getServerUrl } from '../config';
 import './ContentEditor.css';
 
 /**
@@ -18,7 +19,7 @@ function ContentEditor({ pageId = 'home' }) {
 
   const loadContent = async () => {
     try {
-      const response = await fetch(`http://localhost:3001/api/content/${pageId}`);
+      const response = await fetch(`${getServerUrl()}/api/content/${pageId}`);
       const data = await response.json();
       setContent(data.content);
     } catch (error) {
@@ -44,7 +45,7 @@ function ContentEditor({ pageId = 'home' }) {
     setMessage('');
 
     try {
-      const response = await fetch(`http://localhost:3001/api/content/${pageId}`, {
+      const response = await fetch(`${getServerUrl()}/api/content/${pageId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

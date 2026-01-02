@@ -2,6 +2,16 @@
 
 A developer-first CMS with live preview and content editing capabilities. Think VS Code meets headless CMS with inline editing for clients.
 
+## 🌐 Network-Enabled Editing
+
+NodeLx now supports **distributed editing** over your local network! Edit from any device while your source code stays on your development machine.
+
+```
+Desktop/Tablet  ──HTTP/WS──►  Laptop (Server + Files)
+```
+
+[📖 See Network Setup Guide](NETWORK_SETUP.md) for configuration instructions.
+
 ## Architecture
 
 ### For Developers

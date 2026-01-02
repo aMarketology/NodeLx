@@ -3,7 +3,7 @@ import HomePage from './components/HomePage';
 import ContentEditor from './components/ContentEditor';
 import SplitViewEditor from './components/SplitViewEditor';
 import TestSplitView from './components/TestSplitView';
-import VisualEditor from './editor/VisualEditor';
+import ConnectionConfig from './components/ConnectionConfig';
 import './App.css';
 
 /**
@@ -15,20 +15,22 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
   const [highlightedElement, setHighlightedElement] = useState(null);
-  const [editorMode, setEditorMode] = useState('visual'); // 'home', 'split', 'visual'
-  const [editorConfig, setEditorConfig] = useState({
-    websiteUrl: 'http://localhost:3000',
-    projectPath: '/Users/thelegendofzjui/Documents/GitHub/FireUp'
+  const [editorMode, setEditorMode] = useState(false);
+  const [editorConfig, setEditorConfig] = useState(null);
+  const [serverUrl, setServerUrl] = useState(() => {
+    // Check localStorage for saved server URL
+    const saved = localStorage.getItem('nodelx-server-url');
+    return saved || 'http://localhost:3001';
   });
 
   useEffect(() => {
     loadContent();
     setupWebSocket();
-  }, []);
+  }, [serverUrl]);
 
   const loadContent = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/content/home');
+      const response = await fetch(`${serverUrl}/api/content/home`);
       const data = await response.json();
       setContent(data.content);
       setLoading(false);
@@ -39,7 +41,8 @@ function App() {
   };
 
   const setupWebSocket = () => {
-    const ws = new WebSocket('ws://localhost:3001');
+    const wsUrl = serverUrl.replace('http://', 'ws://').replace('https://', 'wss://');
+    const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
       console.log('[WebSocket] Connected to server');
@@ -149,13 +152,11 @@ function App() {
 
   return (
     <div className="app">
+      {/* Connection Configuration */}
+      <ConnectionConfig onUrlChange={setServerUrl} />
+
       {/* Show different views based on mode */}
-      {editorMode === 'visual' ? (
-        <VisualEditor 
-          targetUrl={editorConfig?.websiteUrl || 'http://localhost:3000'}
-          projectPath={editorConfig?.projectPath}
-        />
-      ) : editorMode === 'split' ? (
+      {editorMode ? (
         <SplitViewEditor 
           previewUrl={editorConfig?.websiteUrl || 'http://localhost:3000'}
           onBack={handleBackToHome}

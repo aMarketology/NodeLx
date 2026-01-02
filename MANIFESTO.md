@@ -121,6 +121,50 @@ NodeLx is **not** a traditional CMS. It's a **dual-mode editing interface** that
 
 ---
 
+## 🌐 Network-First Architecture
+
+### Edit From Anywhere, Files Stay Where They Belong
+
+NodeLx uses a **distributed client-server model** inspired by VS Code Remote Development:
+
+```
+┌──────────────────┐         ┌──────────────────┐
+│  Desktop/Tablet  │  HTTP   │  Laptop/Server   │
+│  (Editor UI)     │ ◄─────► │  (NodeLx Server) │
+│                  │  WS     │                  │
+│  localhost:5174  │         │  192.168.1.x     │
+└──────────────────┘         └──────────────────┘
+                                      ↓
+                             ┌────────────────┐
+                             │  Source Files  │
+                             │  (Filesystem)  │
+                             └────────────────┘
+```
+
+**Why This Matters:**
+
+1. **Code Lives on Development Machine**  
+   Your source files stay on your primary dev machine (laptop, server, etc.). No syncing, no conflicts.
+
+2. **Edit From Any Device**  
+   Use your desktop, tablet, or even phone to edit. Just point the editor to your server's IP.
+
+3. **Real-Time Collaboration**  
+   Multiple team members can connect to the same NodeLx server simultaneously. WebSocket keeps everyone in sync.
+
+4. **No File Mounting Required**  
+   Unlike SMB/NFS shares, NodeLx operates over HTTP/WebSocket. No network filesystem latency or locking issues.
+
+5. **Works Like VS Code Remote**  
+   Same proven pattern used by JetBrains Gateway, VS Code Remote Development, and SSH terminals.
+
+**Security Model:**
+- **Local Network**: Safe for LAN use (192.168.x.x)
+- **Token Auth** (coming soon): Secure access for remote editing
+- **HTTPS** (production): Encrypted connections for public deployments
+
+---
+
 ## 🎨 Design Philosophy
 
 ### 1. **Developer Experience First**

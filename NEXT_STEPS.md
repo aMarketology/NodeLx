@@ -34,6 +34,17 @@
 - **0 dependencies** on proprietary services
 - **100% open source**
 
+### 🚧 What's Next (Phase 1.5: Network Access)
+
+**IMMEDIATE PRIORITY**: Enable network-based editing
+
+**Use Case**: 
+- Source code lives on Laptop (192.168.1.178)
+- Edit from Desktop using NodeLx Editor
+- Server runs on laptop, UI on desktop
+
+**Status**: In Progress (January 2026)
+
 ---
 
 ## 🔑 Dual-Mode Architecture
@@ -260,6 +271,68 @@ config/
 ```
 
 **Estimated Time:** 2 days
+
+---
+
+### Priority 1: Network Access (CURRENT SPRINT)
+
+#### 1.1 Enable Remote Server Access
+**Why**: Edit from any device on local network  
+**Impact**: True distributed editing experience
+
+**Tasks:**
+- [x] Update MANIFESTO.md with network architecture vision
+- [x] Update NEXT_STEPS.md with implementation plan
+- [ ] Enable CORS for all origins (development mode)
+- [ ] Bind server to 0.0.0.0 instead of localhost
+- [ ] Add configurable SERVER_URL to client
+- [ ] Create connection UI for entering server IP
+- [ ] Test cross-device editing (Desktop → Laptop server)
+- [ ] Document firewall setup for Windows/Mac/Linux
+
+**Architecture:**
+```
+Desktop (Editor UI)  →  HTTP/WS  →  Laptop (NodeLx Server + Files)
+   localhost:5174              192.168.1.178:3001
+```
+
+**Files to modify:**
+- `server/index.js` - CORS config, bind to 0.0.0.0
+- `client/App.jsx` - Dynamic SERVER_URL
+- `client/components/HomePage.jsx` - Add connection config UI
+- `README.md` - Network setup instructions
+
+**Security Considerations:**
+- Development: Open CORS on local network only
+- Production: Add token-based authentication
+- Future: HTTPS + proper auth layer
+
+**Estimated Time:** 1-2 days
+
+---
+
+### Priority 2: Network Security
+
+#### 2.1 Basic Authentication
+**Why**: Protect file system access on local network  
+**Impact**: Safe multi-user editing
+
+**Tasks:**
+- [ ] Add simple token-based auth
+- [ ] Connection password in UI
+- [ ] Token verification middleware
+- [ ] Session management
+- [ ] Secure WebSocket connections
+
+**Files to create:**
+```
+server/
+  └── auth/
+      ├── tokens.js
+      └── middleware.js
+```
+
+**Estimated Time:** 2-3 days
 
 ---
 
