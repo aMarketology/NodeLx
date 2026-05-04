@@ -1,14 +1,18 @@
 {
   "name": "nodelx",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Visual editor for Node.js websites — click-to-edit text, swap images, write to source.",
+  "main": "server/index.js",
+  "bin": {
+    "nodelx": "./bin/nodelx.js"
+  },
   "scripts": {
     "dev": "node server/index.js",
     "client": "vite",
     "dev:all": "concurrently \"npm run dev\" \"npm run client\"",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "node bin/nodelx.js start"
   },
   "keywords": [],
   "author": "",

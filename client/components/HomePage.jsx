@@ -1,20 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { getServerUrl } from '../config';
 import DebugConsole from './DebugConsole';
 import './HomePage.css';
 
-/**
- * Sample HomePage component with editable regions
- * The data-editable attribute marks regions that can be edited by clients
- */
 function HomePage({ content, onLaunchEditor }) {
   const [websiteUrl, setWebsiteUrl] = useState('http://localhost:3000');
-  const [localPath, setLocalPath] = useState('C:\\Users\\Allied Gaming\\Documents\\GitHub\\austin-crate');
+  const [localPath, setLocalPath] = useState('');
+  const [status, setStatus] = useState('');
 
-  const handleConnect = () => {
-    console.log('Connecting to:', { websiteUrl, localPath });
-    // Launch the split-view editor
+  // Auto-fill from server config on mount
+  useEffect(() => {
+    fetch(`${getServerUrl()}/api/health`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.siteUrl) setWebsiteUrl(data.siteUrl);
+        if (data.projectPath) setLocalPath(data.projectPath);
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleConnect = async () => {
+    if (!localPath) {
+      setStatus('Please enter a local project path.');
+      return;
+    }
+    setStatus('Connecting...');
     if (onLaunchEditor) {
-      onLaunchEditor({ websiteUrl, localPath });
+      await onLaunchEditor({ websiteUrl, localPath });
     }
   };
 
@@ -60,6 +72,8 @@ function HomePage({ content, onLaunchEditor }) {
                 placeholder="C:\path\to\your\project"
               />
             </div>
+
+            {status && <p className="connect-status">{status}</p>}
 
             <button
               onClick={handleConnect}

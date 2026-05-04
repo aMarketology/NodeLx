@@ -121,8 +121,19 @@ function App() {
     }
   };
 
-  const handleLaunchEditor = (config) => {
-    console.log('Launching editor with config:', config);
+  const handleLaunchEditor = async (config) => {
+    // Tell the server which project to edit
+    if (config.localPath) {
+      try {
+        await fetch(`${serverUrl}/api/project/set-path`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectPath: config.localPath })
+        });
+      } catch (err) {
+        console.error('[App] Could not set project path:', err);
+      }
+    }
     setEditorConfig(config);
     setEditorMode(true);
   };
