@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { getServerUrl, getWebSocketUrl } from '../config';
 import './VisualEditor.css';
 
 /**
@@ -12,7 +11,7 @@ import './VisualEditor.css';
  * 4. Communicates with the AST API to modify source code
  */
 
-const API_BASE = getServerUrl();
+const API_BASE = 'http://localhost:3001';
 
 export default function VisualEditor({ targetUrl = 'http://localhost:3000', projectPath }) {
   // State
@@ -69,7 +68,7 @@ export default function VisualEditor({ targetUrl = 'http://localhost:3000', proj
 
   // Setup WebSocket for real-time updates
   const setupWebSocket = () => {
-    const ws = new WebSocket(getWebSocketUrl());
+    const ws = new WebSocket('ws://localhost:3001');
     
     ws.onopen = () => {
       console.log('[VisualEditor] WebSocket connected');
