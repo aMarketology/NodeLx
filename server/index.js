@@ -1,13 +1,18 @@
-const express = require('express');
-const http = require('http');
-const path = require('path');
-const cors = require('cors');
-const ContentStore = require('./contentStore');
+require('dotenv').config();
+const express      = require('express');
+const http         = require('http');
+const path         = require('path');
+const cors         = require('cors');
+const cookieParser = require('cookie-parser');
+const helmet       = require('helmet');
+const ContentStore  = require('./contentStore');
 const WebSocketServer = require('./websocket');
-const SourceMapper = require('./sourceMap');
-const CodeEditor = require('./codeEditor');
-const ast = require('./ast');
-const themeManager = require('./themeManager');
+const SourceMapper  = require('./sourceMap');
+const CodeEditor    = require('./codeEditor');
+const ast           = require('./ast');
+const themeManager  = require('./themeManager');
+const adminRoutes   = require('./routes/admin');
+const { requireAuth, requireRole } = require('./auth/middleware');
 
 /**
  * NodeLx Development Server
@@ -16,7 +21,6 @@ const themeManager = require('./themeManager');
 class NodeLxServer {
   constructor(options = {}) {
     this.port = options.port || 3001;
-    this.sitePort = options.sitePort || 3000;
     this.app = express();
     this.server = http.createServer(this.app);
 
@@ -24,18 +28,22 @@ class NodeLxServer {
     this.contentStore = new ContentStore('./content');
     this.wsServer = new WebSocketServer(this.server);
     this.sourceMapper = new SourceMapper('./client/components');
-    this.codeEditor = new CodeEditor(options.projectPath || null);
+    this.codeEditor = new CodeEditor(); // Will be configured per-request
   }
 
   async initialize() {
     // Middleware
-    // NETWORK MODE: Allow connections from any device on local network
+    this.app.use(helmet({ contentSecurityPolicy: false })); // CSP off for dev iframe previews
     this.app.use(cors({
-      origin: true, // Accept requests from any origin (dev mode)
+      origin: true, // Accept from any origin in dev; lock down in production via NODE_ENV
       credentials: true
     }));
     this.app.use(express.json());
+    this.app.use(cookieParser());
     this.app.use(express.static('public'));
+
+    // Auth + Admin routes (login page, /admin/*, /api/auth/*)
+    this.app.use(adminRoutes);
 
     // Initialize content store
     await this.contentStore.initialize();
@@ -55,15 +63,9 @@ class NodeLxServer {
   }
 
   setupRoutes() {
-    // Health check + server config (used by client to auto-fill connection form)
+    // Health check
     this.app.get('/api/health', (req, res) => {
-      res.json({
-        status: 'ok',
-        timestamp: new Date().toISOString(),
-        projectPath: this.codeEditor.projectPath,
-        sitePort: this.sitePort,
-        siteUrl: `http://localhost:${this.sitePort}`
-      });
+      res.json({ status: 'ok', timestamp: new Date().toISOString() });
     });
 
     // Get all content
@@ -181,13 +183,12 @@ class NodeLxServer {
     });
 
     // Read a file
-    this.app.get(/^\/api\/files\/(.+)/, async (req, res) => {
+    this.app.get('/api/files/read', async (req, res) => {
       try {
-        // Extract path after /api/files/
-        const filePath = req.params[0];
+        const filePath = req.query.path;
         
         if (!filePath) {
-          return res.status(400).json({ error: 'File path is required' });
+          return res.status(400).json({ error: 'File path is required (use ?path=...)' });
         }
 
         const file = await this.codeEditor.readFile(filePath);
@@ -201,10 +202,9 @@ class NodeLxServer {
     });
 
     // Write/Update a file
-    this.app.put(/^\/api\/files\/(.+)/, async (req, res) => {
+    this.app.put('/api/files/write', async (req, res) => {
       try {
-        const filePath = req.params[0];
-        const { content, createBackup = true } = req.body;
+        const { path: filePath, content, createBackup = true } = req.body;
         
         if (!filePath) {
           return res.status(400).json({ error: 'File path is required' });
@@ -230,10 +230,9 @@ class NodeLxServer {
     });
 
     // Create a new file
-    this.app.post(/^\/api\/files\/(.+)/, async (req, res) => {
+    this.app.post('/api/files/create', async (req, res) => {
       try {
-        const filePath = req.params[0];
-        const { content = '' } = req.body;
+        const { path: filePath, content = '' } = req.body;
         
         if (!filePath) {
           return res.status(400).json({ error: 'File path is required' });
@@ -258,9 +257,9 @@ class NodeLxServer {
     });
 
     // Delete a file
-    this.app.delete(/^\/api\/files\/(.+)/, async (req, res) => {
+    this.app.delete('/api/files/delete', async (req, res) => {
       try {
-        const filePath = req.params[0];
+        const { path: filePath } = req.body;
         
         if (!filePath) {
           return res.status(400).json({ error: 'File path is required' });
@@ -314,9 +313,14 @@ class NodeLxServer {
     // ========================================
 
     // Get all editable elements in a file
-    this.app.get(/^\/api\/ast\/editable\/(.+)/, async (req, res) => {
+    this.app.get('/api/ast/editable', async (req, res) => {
       try {
-        const filePath = req.params[0];
+        const filePath = req.query.path;
+        
+        if (!filePath) {
+          return res.status(400).json({ error: 'File path is required (use ?path=...)' });
+        }
+        
         const fullPath = path.resolve(this.codeEditor.projectPath, filePath);
         
         const result = await ast.manager.findAllEditable(fullPath);
@@ -859,17 +863,16 @@ class NodeLxServer {
   }
 
   start() {
-    this.server.listen(this.port, '0.0.0.0', () => {
+    this.server.listen(this.port, () => {
       console.log('\n==========================================');
-      console.log('NodeLx Development Server');
+      console.log('🚀 NodeLx Development Server');
       console.log('==========================================');
-      console.log(`NodeLx UI:    http://localhost:${this.port}`);
-      console.log(`Network:      http://<YOUR_IP>:${this.port}`);
-      console.log(`Site preview: http://localhost:${this.sitePort}`);
-      console.log(`Project path: ${this.codeEditor.projectPath}`);
-      console.log('------------------------------------------');
+      console.log(`Server running at: http://localhost:${this.port}`);
       console.log(`Content Store: ${this.contentStore.store.size} pages loaded`);
       console.log(`Source Mapper: ${this.sourceMapper.sourceMap.size} components mapped`);
+      console.log(`Code Editor: Ready (Developer Mode)`);
+      console.log(`AST Parser: Ready`);
+      console.log(`Theme Manager: Ready`);
       console.log('==========================================');
       console.log('API Endpoints:');
       console.log('  Content:  GET/PATCH /api/content/:pageId');
@@ -895,22 +898,9 @@ class NodeLxServer {
   }
 }
 
-// Parse CLI args: --project <path> --site-port <port> --port <nodelx-port>
-function parseArgs() {
-  const args = process.argv.slice(2);
-  const opts = {};
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--project' && args[i + 1]) opts.projectPath = args[++i];
-    else if (args[i] === '--site-port' && args[i + 1]) opts.sitePort = parseInt(args[++i]);
-    else if (args[i] === '--port' && args[i + 1]) opts.port = parseInt(args[++i]);
-  }
-  return opts;
-}
-
 // Start server if run directly
 if (require.main === module) {
-  const cliOpts = parseArgs();
-  const server = new NodeLxServer({ port: cliOpts.port || 3001, ...cliOpts });
+  const server = new NodeLxServer({ port: 3001 });
 
   server
     .initialize()

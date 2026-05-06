@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NodeLx — Client Editor</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0a0a0a;
+      color: #e5e5e5;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    h1 { font-size: 1.5rem; color: #3b82f6; }
+    p  { color: #555; font-size: 0.9rem; }
+    a  { color: #3b82f6; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <h1>🔒 Client Editor</h1>
+  <p>Coming in Week 4 (Milestone 3).</p>
+  <p><a href="/admin/logout">Sign out</a></p>
+  <script>
+    // Verify auth — if not logged in, redirect to login
+    fetch('/api/auth/me', { credentials: 'include' })
+      .then(r => { if (!r.ok) window.location.href = '/admin/login'; });
+  </script>
+</body>
+</html>
