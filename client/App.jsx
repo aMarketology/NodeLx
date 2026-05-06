@@ -3,7 +3,7 @@ import HomePage from './components/HomePage';
 import ContentEditor from './components/ContentEditor';
 import SplitViewEditor from './components/SplitViewEditor';
 import TestSplitView from './components/TestSplitView';
-import ConnectionConfig from './components/ConnectionConfig';
+import VisualEditor from './editor/VisualEditor';
 import './App.css';
 
 /**
@@ -15,22 +15,20 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
   const [highlightedElement, setHighlightedElement] = useState(null);
-  const [editorMode, setEditorMode] = useState(false);
-  const [editorConfig, setEditorConfig] = useState(null);
-  const [serverUrl, setServerUrl] = useState(() => {
-    // Check localStorage for saved server URL
-    const saved = localStorage.getItem('nodelx-server-url');
-    return saved || 'http://localhost:3001';
+  const [editorMode, setEditorMode] = useState('visual'); // 'home', 'split', 'visual'
+  const [editorConfig, setEditorConfig] = useState({
+    websiteUrl: 'http://localhost:3000',
+    projectPath: '/Users/thelegendofzjui/Documents/GitHub/FireUp'
   });
 
   useEffect(() => {
     loadContent();
     setupWebSocket();
-  }, [serverUrl]);
+  }, []);
 
   const loadContent = async () => {
     try {
-      const response = await fetch(`${serverUrl}/api/content/home`);
+      const response = await fetch('http://localhost:3001/api/content/home');
       const data = await response.json();
       setContent(data.content);
       setLoading(false);
@@ -41,8 +39,7 @@ function App() {
   };
 
   const setupWebSocket = () => {
-    const wsUrl = serverUrl.replace('http://', 'ws://').replace('https://', 'wss://');
-    const ws = new WebSocket(wsUrl);
+    const ws = new WebSocket('ws://localhost:3001');
 
     ws.onopen = () => {
       console.log('[WebSocket] Connected to server');
@@ -121,19 +118,8 @@ function App() {
     }
   };
 
-  const handleLaunchEditor = async (config) => {
-    // Tell the server which project to edit
-    if (config.localPath) {
-      try {
-        await fetch(`${serverUrl}/api/project/set-path`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ projectPath: config.localPath })
-        });
-      } catch (err) {
-        console.error('[App] Could not set project path:', err);
-      }
-    }
+  const handleLaunchEditor = (config) => {
+    console.log('Launching editor with config:', config);
     setEditorConfig(config);
     setEditorMode(true);
   };
@@ -163,11 +149,13 @@ function App() {
 
   return (
     <div className="app">
-      {/* Connection Configuration */}
-      <ConnectionConfig onUrlChange={setServerUrl} />
-
       {/* Show different views based on mode */}
-      {editorMode ? (
+      {editorMode === 'visual' ? (
+        <VisualEditor 
+          targetUrl={editorConfig?.websiteUrl || 'http://localhost:3000'}
+          projectPath={editorConfig?.projectPath}
+        />
+      ) : editorMode === 'split' ? (
         <SplitViewEditor 
           previewUrl={editorConfig?.websiteUrl || 'http://localhost:3000'}
           onBack={handleBackToHome}

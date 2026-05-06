@@ -1,0 +1,16 @@
+[
+  {
+    "id": "1777950350230",
+    "email": "dev@nodelx.dev",
+    "passwordHash": "$2b$12$/LJXOSbt7.emlc8AU62zXO6Q9DcifytVW.NYcPOIlshZlfIKwayxa",
+    "role": "developer",
+    "createdAt": "2026-05-05T03:05:50.230Z"
+  },
+  {
+    "id": "1777950350530",
+    "email": "client@austin.com",
+    "passwordHash": "$2b$12$D46opHaoDWoMrYb/KlOSGOwvXts39ewVeA0NnnUOztEtr9cOG9yWS",
+    "role": "client",
+    "createdAt": "2026-05-05T03:05:50.530Z"
+  }
+]

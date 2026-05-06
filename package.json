@@ -12,7 +12,8 @@
     "dev:all": "concurrently \"npm run dev\" \"npm run client\"",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "node bin/nodelx.js start"
+    "start": "node bin/nodelx.js start",
+    "create-user": "node scripts/create-user.js"
   },
   "keywords": [],
   "author": "",
@@ -23,9 +24,15 @@
     "@babel/parser": "^7.28.5",
     "@babel/traverse": "^7.28.5",
     "@supabase/supabase-js": "^2.84.0",
+    "bcryptjs": "^3.0.3",
     "chokidar": "^4.0.3",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
     "express": "^5.1.0",
+    "express-rate-limit": "^8.5.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "ws": "^8.18.3"
