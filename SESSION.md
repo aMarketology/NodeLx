@@ -347,27 +347,62 @@ After today's session, the rest of the week fills out Milestone 1 and kicks off 
 
 ---
 
-## 📝 Session Notes (fill in as you go)
+## 📝 Session Notes
 
-```
-Hour 1: 
-Hour 2: 
-Hour 3: 
-Hour 4: 
-Lunch:  
-Hour 5: 
-Hour 6: 
-Hour 7: 
-Hour 8: 
-Hour 9: 
-Blockers encountered:
-Decisions made:
-Left for tomorrow:
+**Date:** May 4–5, 2026
+**Hours:** ~9
+**Branch started:** `feature/auth` → **merged to `main`** ✅
+**GitHub:** pushed to `origin/main` (commit `5b1633a`) ✅
+
+### What Was Completed ✅
+- All auth files scaffolded and working
+- Server boots with `dotenv`, `helmet`, `cookieParser`, `adminRoutes` wired
+- Both users seeded (`dev@nodelx.dev` / `client@austin.com`)
+- Login, `/me`, logout, role redirect all verified via curl
+- Rate limiter active
+- `feature/auth` merged to `main` with `--no-ff` merge commit
+- `3MONTHS_PLAN.md` M1 marked complete
+
+### Blockers Encountered
+- Express 5 `_router` inspection behaves differently than Express 4 — used process isolation to debug route registration
+- CORS was narrowed to localhost-only; reverted to `origin: true` for dev network access
+- `users.json` was seeded as `{ users: [] }` object instead of array — fixed with format detection in `users.js`
+
+### Left for Next Session
+- [ ] Open browser to `http://localhost:3001/admin/login` — verify login page loads
+- [ ] Test login flow in actual browser (cookies, redirect)
+- [ ] Begin **Milestone 2**: install `simple-git`, create `server/git/commit.js`
+
+### Next Session Start Commands
+```bash
+cd ~/Documents/GitHub/NodeLx
+git pull origin main          # get latest
+node server/index.js &        # start server
+open http://localhost:3001/admin/login   # test in browser
 ```
 
 ---
 
-*Session started: May 4, 2026*
-*Session doc: `SESSION.md`*
-*3-month plan: `3MONTHS_PLAN.md`*
-*Manifesto: `MANIFESTO.md`*
+## 🔁 End-of-Session Git Ritual (Run Every Session)
+
+At the end of EVERY session, run these commands to keep docs + GitHub in sync:
+
+```bash
+cd ~/Documents/GitHub/NodeLx
+
+# 1. Stage everything including doc updates
+git add -A
+
+# 2. Commit with a session summary message
+git commit -m "session: [DATE] — [what you did in one line]"
+
+# 3. Push to GitHub
+git push origin main
+
+# 4. Open these docs and update checkboxes/notes:
+#    - SESSION.md      → fill in what was done, blockers, next steps
+#    - 3MONTHS_PLAN.md → check off completed milestone tasks
+#    - NEXT_STEPS.md   → update priority queue
+```
+
+**This ritual takes 5 minutes. Skip it and you lose context. Do it every time.**

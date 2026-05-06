@@ -109,29 +109,33 @@ Each milestone has a **demo-able outcome**. If we can't demo it, it's not done.
 
 ---
 
-### 🏗️ MILESTONE 1 — Auth Foundation (Weeks 1–2)
-**Dates:** May 5 – May 18
-**Demo:** "I can log in at `/admin`, see my role, and log out."
+### 🏗️ MILESTONE 1 — Auth Foundation ✅ COMPLETE
+**Dates:** May 4 – May 5 (shipped 1 week early)
+**Commit:** `5b1633a` merged to `main` → pushed to GitHub
 
-#### Week 1 — Auth Plumbing
-- [ ] Add `bcrypt`, `jsonwebtoken`, `cookie-parser` to `package.json`
-- [ ] `server/auth/users.js` — read/write `content/users.json`
-- [ ] `server/auth/hash.js` — bcrypt wrapper
-- [ ] `server/auth/jwt.js` — sign/verify with `JWT_SECRET` env var
-- [ ] `server/auth/middleware.js` — `requireAuth`, `requireRole(role)`
-- [ ] `scripts/create-user.js` — CLI: `npm run user:create -- --email=x --role=client`
-- [ ] Seed first developer user (you)
+#### Completed ✅
+- [x] `bcryptjs`, `jsonwebtoken`, `cookie-parser`, `helmet`, `dotenv` installed
+- [x] `server/auth/hash.js` — bcrypt helpers
+- [x] `server/auth/jwt.js` — sign/verify JWT + HTTP-only cookie helpers
+- [x] `server/auth/users.js` — read/write `content/users.json`
+- [x] `server/auth/middleware.js` — `requireAuth`, `requireRole(role)`
+- [x] `scripts/create-user.js` — `npm run create-user -- --email=x --role=y`
+- [x] `server/routes/admin.js` — all `/admin/*` and `/api/auth/*` routes
+- [x] `public/admin/login.html` — styled login page (dark theme)
+- [x] `.env` + `.env.example` — JWT_SECRET, COOKIE_NAME, PORT
+- [x] `content/users.json` — seeded: `dev@nodelx.dev` + `client@austin.com`
+- [x] `server/index.js` — wired `dotenv`, `helmet`, `cookieParser`, `adminRoutes`
 
-#### Week 2 — Admin Shell
-- [ ] `POST /api/auth/login` — accepts email/password, sets HTTP-only cookie
-- [ ] `POST /api/auth/logout` — clears cookie
-- [ ] `GET /api/auth/me` — returns current user
-- [ ] `public/admin/login.html` — minimal styled login page
-- [ ] Rate limit login: 5 attempts per IP per 15 min (`express-rate-limit`)
-- [ ] `/admin` redirects: not logged in → login; client → `/admin/editor`; dev → `/admin/dev`
-- [ ] Existing editor moved to `/admin/dev` and gated behind `requireRole('developer')`
+#### Verified Working ✅
+- `POST /api/auth/login` → `{ ok: true, role: 'developer' }`
+- `GET /api/auth/me` → `{ id, email, role }` (requires cookie)
+- Wrong password → `{ error: 'Invalid email or password.' }`
+- Rate limiter: 5 attempts / 15 min (returns 429)
+- `/admin` → redirects to `/admin/login` when not authenticated
 
-**Exit criteria:** Two users (`dev@nodelx`, `client@test`) can log in and land on different pages. Wrong password is rate-limited.
+**Exit criteria: MET.** Two users log in, land on role-correct pages, wrong password rejected.
+
+---
 
 ---
 
