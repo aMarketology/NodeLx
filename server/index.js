@@ -20,7 +20,7 @@ const { requireAuth, requireRole } = require('./auth/middleware');
  */
 class NodeLxServer {
   constructor(options = {}) {
-    this.port = options.port || 3001;
+    this.port = options.port || process.env.PORT || 3001;
     this.app = express();
     this.server = http.createServer(this.app);
 
@@ -863,11 +863,11 @@ class NodeLxServer {
   }
 
   start() {
-    this.server.listen(this.port, () => {
+    this.server.listen(this.port, '0.0.0.0', () => {
       console.log('\n==========================================');
       console.log('🚀 NodeLx Development Server');
       console.log('==========================================');
-      console.log(`Server running at: http://localhost:${this.port}`);
+      console.log(`Server running at: http://0.0.0.0:${this.port}`);
       console.log(`Content Store: ${this.contentStore.store.size} pages loaded`);
       console.log(`Source Mapper: ${this.sourceMapper.sourceMap.size} components mapped`);
       console.log(`Code Editor: Ready (Developer Mode)`);
@@ -900,7 +900,8 @@ class NodeLxServer {
 
 // Start server if run directly
 if (require.main === module) {
-  const server = new NodeLxServer({ port: 3001 });
+  const port = process.env.PORT || 3001;
+  const server = new NodeLxServer({ port });
 
   server
     .initialize()

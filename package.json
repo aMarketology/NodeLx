@@ -13,6 +13,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "start": "node bin/nodelx.js start",
+    "railway": "node server/index.js",
     "create-user": "node scripts/create-user.js"
   },
   "keywords": [],
