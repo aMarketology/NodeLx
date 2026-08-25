@@ -12,7 +12,7 @@
     "dev:all": "concurrently \"npm run dev\" \"npm run client\"",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "node bin/nodelx.js start",
+    "start": "node server/index.js",
     "railway": "node server/index.js",
     "create-user": "node scripts/create-user.js"
   },
