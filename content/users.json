@@ -1,5 +1,12 @@
 [
   {
+    "id": "admin-001",
+    "email": "max@amarketology.com",
+    "passwordHash": "$2b$12$KUgY2iFv5QyQ6m.pBECbmOnGg1EYGOB.alo899R2R4.9XheaUgyO6",
+    "role": "developer",
+    "createdAt": "2026-08-26T00:00:00.000Z"
+  },
+  {
     "id": "1777950350230",
     "email": "dev@nodelx.dev",
     "passwordHash": "$2b$12$/LJXOSbt7.emlc8AU62zXO6Q9DcifytVW.NYcPOIlshZlfIKwayxa",
