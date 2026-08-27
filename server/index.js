@@ -63,6 +63,11 @@ class NodeLxServer {
   }
 
   setupRoutes() {
+    // Root route → redirect to admin login
+    this.app.get('/', (req, res) => {
+      res.redirect('/admin');
+    });
+
     // Health check
     this.app.get('/api/health', (req, res) => {
       res.json({ status: 'ok', timestamp: new Date().toISOString() });
