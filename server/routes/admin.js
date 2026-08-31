@@ -5,6 +5,7 @@ const { findByEmail } = require('../auth/users');
 const { verifyPassword }  = require('../auth/hash');
 const { setAuthCookie, clearAuthCookie, verifyToken, COOKIE_NAME } = require('../auth/jwt');
 const { requireAuth, requireRole } = require('../auth/middleware');
+const { getSites } = require('../sites');
 
 const router = express.Router();
 
@@ -40,10 +41,9 @@ router.get('/admin/login', (req, res) => {
   res.sendFile(path.resolve(__dirname, '../../public/admin/login.html'));
 });
 
-// GET /admin/dev → Developer Mode editor (developer only)
+// GET /admin/dev → Developer dashboard (developer only)
 router.get('/admin/dev', requireAuth, requireRole('developer'), (req, res) => {
-  // Serve the existing split-view editor (Vite dev or built index.html)
-  res.sendFile(path.resolve(__dirname, '../../public/index.html'));
+  res.sendFile(path.resolve(__dirname, '../../public/admin/dashboard.html'));
 });
 
 // GET /admin/editor → Client Mode editor (client or developer)
@@ -91,6 +91,11 @@ router.post('/api/auth/logout', (req, res) => {
 router.get('/api/auth/me', requireAuth, (req, res) => {
   const { id, email, role } = req.user;
   res.json({ id, email, role });
+});
+
+// GET /api/sites → list all managed sites (developer only)
+router.get('/api/sites', requireAuth, requireRole('developer'), (req, res) => {
+  res.json({ sites: getSites() });
 });
 
 module.exports = router;

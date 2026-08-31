@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NodeLx — Websites</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0a;
+      color: #e5e5e5;
+      min-height: 100vh;
+    }
+
+    /* ── Top bar ─────────────────────────────────────── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 2rem;
+      border-bottom: 1px solid #1c1c1c;
+      background: #0d0d0d;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .brand-dot {
+      width: 9px;
+      height: 9px;
+      background: #3b82f6;
+      border-radius: 50%;
+    }
+
+    .brand-name { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.01em; }
+    .brand-name span { color: #3b82f6; }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .user-chip {
+      font-size: 0.8125rem;
+      color: #888;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .user-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #1f2937;
+      color: #3b82f6;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+    }
+
+    .logout-link {
+      color: #888;
+      text-decoration: none;
+      font-size: 0.8125rem;
+      padding: 0.4rem 0.75rem;
+      border: 1px solid #242424;
+      border-radius: 7px;
+      transition: all 0.15s;
+    }
+    .logout-link:hover { color: #e5e5e5; border-color: #3b82f6; }
+
+    /* ── Main content ───────────────────────────────── */
+    .main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2.5rem 2rem 4rem;
+    }
+
+    .page-header { margin-bottom: 2rem; }
+
+    .page-title {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.375rem;
+    }
+
+    .page-subtitle { color: #666; font-size: 0.9rem; }
+
+    /* ── Site cards grid ────────────────────────────── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .site-card {
+      background: #141414;
+      border: 1px solid #222;
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+      text-decoration: none;
+      color: inherit;
+      display: block;
+    }
+
+    .site-card:hover {
+      border-color: #3b82f6;
+      transform: translateY(-2px);
+      box-shadow: 0 12px 30px rgba(0,0,0,0.45);
+    }
+
+    .site-thumb {
+      height: 150px;
+      background: linear-gradient(135deg, #1a1a1a 0%, #111827 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: #3b82f6;
+      letter-spacing: -0.02em;
+      border-bottom: 1px solid #222;
+    }
+
+    .site-body { padding: 1.125rem 1.25rem 1.25rem; }
+
+    .site-name {
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+
+    .site-subtitle {
+      font-size: 0.8125rem;
+      color: #777;
+      margin-bottom: 0.875rem;
+    }
+
+    .site-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      color: #666;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 600;
+    }
+
+    .status-live {
+      background: rgba(34,197,94,0.12);
+      color: #4ade80;
+      border: 1px solid rgba(34,197,94,0.25);
+    }
+
+    .status-live::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #4ade80;
+    }
+
+    /* ── Empty state ────────────────────────────────── */
+    .empty {
+      text-align: center;
+      padding: 4rem 1rem;
+      color: #555;
+    }
+
+    .empty-icon { font-size: 2.5rem; margin-bottom: 1rem; }
+    .empty-title { font-size: 1.1rem; color: #888; margin-bottom: 0.375rem; }
+    .empty-text { font-size: 0.875rem; }
+
+    /* ── Add site button ────────────────────────────── */
+    .add-card {
+      background: transparent;
+      border: 1px dashed #333;
+      border-radius: 12px;
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      color: #555;
+      cursor: pointer;
+      padding: 2rem;
+      transition: all 0.15s;
+    }
+    .add-card:hover { border-color: #3b82f6; color: #3b82f6; }
+    .add-icon { font-size: 2rem; font-weight: 300; }
+
+    /* ── Loading ────────────────────────────────────── */
+    .loading {
+      text-align: center;
+      padding: 4rem;
+      color: #555;
+      font-size: 0.9rem;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 24px;
+      height: 24px;
+      border: 2px solid #242424;
+      border-top-color: #3b82f6;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-bottom: 0.75rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="brand-dot"></div>
+      <div class="brand-name">Node<span>Lx</span></div>
+    </div>
+    <div class="topbar-right">
+      <div class="user-chip">
+        <span class="user-avatar" id="userAvatar">?</span>
+        <span id="userEmail">…</span>
+      </div>
+      <a href="/admin/logout" class="logout-link">Sign out</a>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="page-header">
+      <h1 class="page-title">Your Websites</h1>
+      <p class="page-subtitle">Manage content across all your sites from one place.</p>
+    </div>
+
+    <div id="content">
+      <div class="loading">
+        <div class="spinner"></div>
+        <div>Loading sites…</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (async function () {
+      const content = document.getElementById('content');
+
+      // Fetch current user for the avatar + auth check
+      try {
+        const meRes = await fetch('/api/auth/me', { credentials: 'include' });
+        if (!meRes.ok) {
+          window.location.href = '/admin/login';
+          return;
+        }
+        const me = await meRes.json();
+        document.getElementById('userEmail').textContent = me.email;
+        document.getElementById('userAvatar').textContent = (me.email || '?').charAt(0).toUpperCase();
+      } catch {
+        window.location.href = '/admin/login';
+        return;
+      }
+
+      // Fetch sites
+      try {
+        const res = await fetch('/api/sites', { credentials: 'include' });
+        if (!res.ok) throw new Error('Failed to load sites');
+        const { sites } = await res.json();
+        renderSites(sites);
+      } catch (err) {
+        content.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-title">Could not load sites</div><div class="empty-text">' + err.message + '</div></div>';
+      }
+    })();
+
+    function renderSites(sites) {
+      const content = document.getElementById('content');
+
+      if (!sites || sites.length === 0) {
+        content.innerHTML = '' +
+          '<div class="empty">' +
+            '<div class="empty-icon">🌐</div>' +
+            '<div class="empty-title">No websites yet</div>' +
+            '<div class="empty-text">Add a website to start managing its content.</div>' +
+          '</div>';
+        return;
+      }
+
+      const cards = sites.map(site => {
+        const initial = (site.name || '?').charAt(0).toUpperCase();
+        const adminUrl = site.adminUrl || '/admin/editor';
+        return '' +
+          '<a class="site-card" href="' + adminUrl + '">' +
+            '<div class="site-thumb">' + initial + '</div>' +
+            '<div class="site-body">' +
+              '<div class="site-name">' + escapeHtml(site.name) + '</div>' +
+              '<div class="site-subtitle">' + escapeHtml(site.subtitle || '') + '</div>' +
+              '<div class="site-meta">' +
+                '<span class="status-badge status-live">Live</span>' +
+                '<span>' + escapeHtml(site.repo || '') + '</span>' +
+              '</div>' +
+            '</div>' +
+          '</a>';
+      }).join('');
+
+      // Append an "add site" placeholder card
+      const addCard = '' +
+        '<div class="add-card">' +
+          '<div class="add-icon">+</div>' +
+          '<div>Add Website</div>' +
+        '</div>';
+
+      content.innerHTML = '<div class="grid">' + cards + addCard + '</div>';
+    }
+
+    function escapeHtml(str) {
+      return String(str || '').replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[c]));
+    }
+  </script>
+</body>
+</html>
