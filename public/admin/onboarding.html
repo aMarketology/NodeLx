@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NodeLx — Onboard a Website</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0a; color: #e5e5e5; min-height: 100vh;
+    }
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1rem 2rem; border-bottom: 1px solid #1c1c1c; background: #0d0d0d;
+    }
+    .brand { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font-size: 1.15rem; }
+    .brand-dot { width: 9px; height: 9px; background: #3b82f6; border-radius: 50%; }
+    .brand span { color: #3b82f6; }
+    .nav a { color: #888; text-decoration: none; font-size: 0.8125rem; margin-left: 1rem; }
+    .nav a:hover { color: #e5e5e5; }
+
+    .main { max-width: 680px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
+    h1 { font-size: 1.6rem; letter-spacing: -0.02em; margin-bottom: 0.375rem; }
+    .sub { color: #666; font-size: 0.9rem; margin-bottom: 2rem; }
+
+    .card { background: #141414; border: 1px solid #222; border-radius: 12px; padding: 1.75rem; }
+    .field { margin-bottom: 1.125rem; }
+    label { display: block; font-size: 0.8125rem; color: #888; margin-bottom: 0.375rem; font-weight: 500; }
+    input { width: 100%; background: #0a0a0a; border: 1px solid #242424; border-radius: 7px;
+      color: #e5e5e5; padding: 0.625rem 0.875rem; font-size: 0.9rem; outline: none; }
+    input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+    .hint { font-size: 0.75rem; color: #555; margin-top: 0.35rem; }
+
+    .btn { width: 100%; background: #3b82f6; color: #fff; border: none; border-radius: 7px;
+      padding: 0.75rem; font-size: 0.9rem; font-weight: 600; cursor: pointer; margin-top: 0.5rem; }
+    .btn:hover:not(:disabled) { background: #2563eb; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn.secondary { background: transparent; border: 1px solid #333; color: #aaa; }
+
+    .status { padding: 0.75rem 0.875rem; border-radius: 7px; font-size: 0.8125rem; line-height: 1.4;
+      margin-bottom: 1.125rem; display: none; }
+    .status.ok { background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.25); color: #4ade80; }
+    .status.err { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25); color: #fca5a5; }
+    .status.warn { background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.25); color: #fbbf24; }
+
+    .steps { list-style: none; margin: 1.25rem 0 0; padding-top: 1.25rem; border-top: 1px solid #1c1c1c; }
+    .steps li { font-size: 0.8125rem; color: #777; margin-bottom: 0.5rem; padding-left: 1.25rem; position: relative; }
+    .steps li::before { content: "✓"; position: absolute; left: 0; color: #3b82f6; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><div class="brand-dot"></div>Node<span>Lx</span></div>
+    <div class="nav">
+      <a href="/admin/dev">Dashboard</a>
+      <a href="/admin/logout">Sign out</a>
+    </div>
+  </div>
+
+  <div class="main">
+    <h1>Onboard a Website</h1>
+    <p class="sub">Connect a client's GitHub repository so NodeLx can publish edits straight to it.</p>
+
+    <div class="card">
+      <div class="status" id="status"></div>
+
+      <div class="field">
+        <label for="name">Site name</label>
+        <input id="name" placeholder="William B Construction" />
+      </div>
+
+      <div class="field">
+        <label for="repo">GitHub repository</label>
+        <input id="repo" placeholder="ironoak-texas/williamb_constuction" />
+        <div class="hint">Format: <code>owner/repo</code></div>
+      </div>
+
+      <div class="field">
+        <label for="liveUrl">Live URL</label>
+        <input id="liveUrl" placeholder="https://www.diamondbctx.com" />
+      </div>
+
+      <div class="field">
+        <label for="branch">Branch (optional)</label>
+        <input id="branch" placeholder="main" value="main" />
+      </div>
+
+      <button class="btn" id="submitBtn">1 · Verify repo access</button>
+      <button class="btn secondary" id="saveBtn" style="display:none;">2 · Save this site</button>
+
+      <ul class="steps">
+        <li>Fine-grained PAT with <code>Contents: read &amp; write</code> on this repo</li>
+        <li>NodeLx commits edits to <code>content/&lt;page&gt;.json</code></li>
+        <li>Live site revalidates on publish (no full redeploy)</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    const repoInput   = document.getElementById('repo');
+    const nameInput   = document.getElementById('name');
+    const liveUrlInput = document.getElementById('liveUrl');
+    const branchInput = document.getElementById('branch');
+    const statusBox   = document.getElementById('status');
+    const submitBtn   = document.getElementById('submitBtn');
+    const saveBtn     = document.getElementById('saveBtn');
+
+    let lastVerified = null;
+
+    function show(msg, kind) {
+      statusBox.textContent = msg;
+      statusBox.className = 'status ' + kind;
+      statusBox.style.display = 'block';
+    }
+
+    function idFromRepo(repo) {
+      const m = /^[^/]+\/([^/]+)$/.exec(repo.trim());
+      return m ? m[1].toLowerCase().replace(/_/g, '-') : repo.toLowerCase().replace(/_/g, '-');
+    }
+
+    submitBtn.addEventListener('click', async () => {
+      const repo = repoInput.value.trim();
+      if (!/^[^/]+\/[^/]+$/.test(repo)) {
+        return show('Please enter a valid "owner/repo".', 'err');
+      }
+
+      const id = idFromRepo(repo);
+      if (!nameInput.value.trim()) nameInput.value = id.replace(/-/g, ' ');
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Verifying…';
+      saveBtn.style.display = 'none';
+      show('Checking repo access…', 'warn');
+
+      try {
+        const res = await fetch(`/api/sites/${encodeURIComponent(id)}/verify`, { credentials: 'include' });
+        const data = await res.json();
+
+        if (res.ok && data.ok) {
+          lastVerified = { repo, verified: true, defaultBranch: data.defaultBranch };
+          if (data.defaultBranch) branchInput.value = data.defaultBranch;
+          show(`✓ Access confirmed — ${data.fullName}`, 'ok');
+          submitBtn.style.display = 'none';
+          saveBtn.style.display = 'block';
+        } else {
+          lastVerified = { repo, verified: false };
+          show('⚠ ' + (data.error || data.message || 'Verification failed'), 'err');
+          submitBtn.disabled = false;
+          submitBtn.textContent = '1 · Verify repo access';
+        }
+      } catch (err) {
+        show('Network error: ' + err.message, 'err');
+        submitBtn.disabled = false;
+        submitBtn.textContent = '1 · Verify repo access';
+      }
+    });
+
+    saveBtn.addEventListener('click', async () => {
+      const payload = {
+        repo: repoInput.value.trim(),
+        name: nameInput.value.trim(),
+        liveUrl: liveUrlInput.value.trim(),
+        branch: branchInput.value.trim() || 'main',
+      };
+
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving…';
+
+      try {
+        const res = await fetch('/api/sites', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+          show('✅ Site saved. Ready to manage from the dashboard.', 'ok');
+          setTimeout(() => (window.location.href = '/admin/dev'), 900);
+        } else {
+          show('⚠ ' + (data.error || 'Save failed'), 'err');
+          saveBtn.disabled = false;
+          saveBtn.textContent = '2 · Save this site';
+        }
+      } catch (err) {
+        show('Network error: ' + err.message, 'err');
+        saveBtn.disabled = false;
+        saveBtn.textContent = '2 · Save this site';
+      }
+    });
+  </script>
+</body>
+</html>

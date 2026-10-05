@@ -12,7 +12,10 @@ const CodeEditor    = require('./codeEditor');
 const ast           = require('./ast');
 const themeManager  = require('./themeManager');
 const adminRoutes   = require('./routes/admin');
+const sitesRoutes   = require('./routes/sites');
 const { requireAuth, requireRole } = require('./auth/middleware');
+const { verifyToken, COOKIE_NAME } = require('./auth/jwt');
+const GitSync = require('./gitSync');
 
 /**
  * NodeLx Development Server
@@ -29,6 +32,7 @@ class NodeLxServer {
     this.wsServer = new WebSocketServer(this.server);
     this.sourceMapper = new SourceMapper('./client/components');
     this.codeEditor = new CodeEditor(); // Will be configured per-request
+    this.gitSync = new GitSync();
   }
 
   async initialize() {
@@ -44,6 +48,39 @@ class NodeLxServer {
 
     // Auth + Admin routes (login page, /admin/*, /api/auth/*)
     this.app.use(adminRoutes);
+
+    // Sites router (onboarding + Git-backed publishing)
+    this.app.use(sitesRoutes(this.gitSync));
+
+    // ─── 🔒 API security boundary ───────────────────────────────────────────
+    // Public: content reads + health (needed by the live site). Everything else
+    // under /api/* requires a valid auth cookie.
+    const isPublicGet = (u) =>
+      u === '/api/health' ||
+      u === '/api/content' ||
+      u.startsWith('/api/content/');
+
+    this.app.use('/api', (req, res, next) => {
+      const url = req.originalUrl.split('?')[0];
+      if (req.method === 'GET' && isPublicGet(url)) return next();
+
+      const token = req.cookies?.[COOKIE_NAME];
+      const user = token ? verifyToken(token) : null;
+      if (!user) return res.status(401).json({ error: 'Not authenticated' });
+      req.user = user;
+      next();
+    });
+
+    // Developer-only tooling: file system, AST, theme, project, sourcemap.
+    this.app.use(
+      ['/api/files', '/api/ast', '/api/theme', '/api/project', '/api/sourcemap'],
+      (req, res, next) => {
+        if (req.user?.role !== 'developer') {
+          return res.status(403).json({ error: 'Forbidden — developer role required' });
+        }
+        next();
+      }
+    );
 
     // Initialize content store
     await this.contentStore.initialize();
@@ -91,13 +128,30 @@ class NodeLxServer {
       res.json(content);
     });
 
-    // Update content
+    // Update content (authenticated client/developer)
     this.app.patch('/api/content/:pageId', async (req, res) => {
       try {
         const { pageId } = req.params;
         const updates = req.body;
 
         const updated = await this.contentStore.updateContent(pageId, updates);
+
+        // Push to GitHub if a PAT is configured (ignore failures — save should not break)
+        if (this.gitSync.isConfigured()) {
+          try {
+            const result = await this.gitSync.commitFile(
+              {},
+              `content/${pageId}.json`,
+              JSON.stringify(updated, null, 2),
+              `nodelx: update ${pageId} (edited by ${req.user.email})`
+            );
+            updated._commit = result;
+          } catch (err) {
+            console.error('[GitSync] commit failed:', err.message);
+            updated._gitWarning = err.message;
+          }
+        }
+
         res.json(updated);
       } catch (error) {
         res.status(400).json({ error: error.message });

@@ -24,6 +24,7 @@
     "@babel/core": "^7.28.5",
     "@babel/parser": "^7.28.5",
     "@babel/traverse": "^7.28.5",
+    "@octokit/rest": "^21.0.2",
     "@supabase/supabase-js": "^2.84.0",
     "bcryptjs": "^3.0.3",
     "chokidar": "^4.0.3",
