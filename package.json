@@ -7,41 +7,35 @@
     "nodelx": "./bin/nodelx.js"
   },
   "scripts": {
-    "dev": "node server/index.js",
-    "client": "vite",
-    "dev:all": "concurrently \"npm run dev\" \"npm run client\"",
-    "build": "vite build",
-    "preview": "vite preview",
-    "start": "node server/index.js",
-    "railway": "node server/index.js",
-    "create-user": "node scripts/create-user.js"
-  },
+      "dev": "node server/index.js",
+      "build": "vite build",
+      "start": "node server/index.js",
+      "railway": "node server/index.js",
+      "create-user": "node scripts/create-user.js"
+    },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@babel/core": "^7.28.5",
-    "@babel/parser": "^7.28.5",
-    "@babel/traverse": "^7.28.5",
-    "@octokit/rest": "^21.0.2",
-    "@supabase/supabase-js": "^2.84.0",
-    "bcryptjs": "^3.0.3",
-    "chokidar": "^4.0.3",
-    "cookie-parser": "^1.4.7",
-    "cors": "^2.8.5",
-    "dotenv": "^17.4.2",
-    "express": "^5.1.0",
-    "express-rate-limit": "^8.5.0",
-    "helmet": "^8.1.0",
-    "jsonwebtoken": "^9.0.3",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "ws": "^8.18.3"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-react": "^5.1.1",
-    "concurrently": "^9.2.1",
-    "vite": "^7.2.4"
-  }
+      "@octokit/rest": "^21.0.2",
+      "@supabase/supabase-js": "^2.84.0",
+      "bcryptjs": "^3.0.3",
+      "chokidar": "^4.0.3",
+      "cookie-parser": "^1.4.7",
+      "cors": "^2.8.5",
+      "dotenv": "^17.4.2",
+      "express": "^5.1.0",
+      "express-rate-limit": "^8.5.0",
+      "helmet": "^8.1.0",
+      "jsonwebtoken": "^9.0.3",
+      "react": "^19.2.0",
+      "react-dom": "^19.2.0",
+      "react-router-dom": "^6.30.6",
+      "ws": "^8.18.3"
+    },
+    "devDependencies": {
+      "@vitejs/plugin-react": "^5.1.1",
+      "vite": "^7.2.4"
+    }
 }

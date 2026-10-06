@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { resolve } from 'path';
 
 export default defineConfig({
   plugins: [react()],
@@ -8,13 +9,18 @@ export default defineConfig({
     open: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+              target: 'http://localhost:9000',
         changeOrigin: true
       }
     }
   },
   build: {
-    outDir: 'dist',
-    sourcemap: true
-  }
+      outDir: 'dist',
+      sourcemap: true,
+      rollupOptions: {
+        input: {
+          admin: resolve(__dirname, 'admin.html'),
+        },
+      },
+    },
 });

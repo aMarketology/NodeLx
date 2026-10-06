@@ -1,5 +1,6 @@
 const express = require('express');
 const { getSites, getSiteById, upsertSite, deleteSite, idFromRepo } = require('../sites');
+const { setToken, removeToken } = require('../siteTokens');
 const { requireAuth, requireRole } = require('../auth/middleware');
 
 const router = express.Router();
@@ -47,7 +48,7 @@ module.exports = function sitesRouter(gitSync) {
 
   // POST /api/sites → onboard (create) a new site
   router.post('/api/sites', requireAuth, requireRole('developer'), (req, res) => {
-    const { repo, name, liveUrl, subtitle, adminUrl, branch } = req.body || {};
+      const { repo, name, liveUrl, subtitle, adminUrl, branch, pat } = req.body || {};
     if (!repo || !/^[^/]+\/[^/]+$/.test(repo.trim())) {
       return res.status(400).json({ error: 'A valid GitHub "owner/repo" is required' });
     }
@@ -63,16 +64,39 @@ module.exports = function sitesRouter(gitSync) {
       branch: branch || 'main',
     });
 
-    res.status(201).json({ site });
-  });
+      // Store the per-site PAT (gitignored) if provided
+      if (pat && typeof pat === 'string' && pat.trim()) {
+        setToken(id, pat.trim());
+      }
 
-  // GET /api/sites/:id/verify → connectivity check (developer, optional)
-  router.get('/api/sites/:id/verify', requireAuth, requireRole('developer'), sync, async (req, res) => {
-    const site = getSiteById(req.params.id);
-    if (!site) return res.status(404).json({ error: 'Site not found' });
-    const result = await req.gitSync.verifyRepo(site);
-    res.json({ site: site.id, ...result });
-  });
+      res.status(201).json({ site });
+    });
+
+  // GET/POST /api/sites/:id/verify → connectivity check (developer, optional)
+    // Accepts an optional { pat } in the body so onboarding can verify a token
+    // before it's persisted. (POST is used by the onboarding form; GET kept for
+    // backward compatibility.)
+    router.post('/api/sites/:id/verify', requireAuth, requireRole('developer'), sync, async (req, res) => {
+      const site = getSiteById(req.params.id);
+      if (!site) return res.status(404).json({ error: 'Site not found' });
+
+      const { pat } = req.body || {};
+      const verifySite = { ...site };
+      if (pat && typeof pat === 'string' && pat.trim()) {
+        // Temporarily use the provided token for verification
+        verifySite._pat = pat.trim();
+      }
+
+      const result = await req.gitSync.verifyRepo(verifySite);
+      res.json({ site: site.id, ...result });
+    });
+
+    router.get('/api/sites/:id/verify', requireAuth, requireRole('developer'), sync, async (req, res) => {
+      const site = getSiteById(req.params.id);
+      if (!site) return res.status(404).json({ error: 'Site not found' });
+      const result = await req.gitSync.verifyRepo(site);
+      res.json({ site: site.id, ...result });
+    });
 
   // GET /api/sites/:id → single site
   router.get('/api/sites/:id', requireAuth, requireRole('developer'), (req, res) => {

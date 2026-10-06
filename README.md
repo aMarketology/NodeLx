@@ -93,31 +93,37 @@ npm install
 
 ### Development Mode
 
-Run both the backend server and Vite dev server:
+### Single-Process Mode (Recommended)
+
+NodeLx serves the admin SPA from the same Express process. Build once, then run one command:
 
 ```bash
-npm run dev:all
+npm run build   # builds the React admin SPA into dist/
+npm run dev     # single process: Express serves API + admin UI on :9000
 ```
 
-Or run them separately:
+Open **http://localhost:9000** — the admin panel, API, and WebSocket all come from one process.
+
+### Development Mode (Vite hot-reload)
+
+When iterating on the admin UI, run Vite alongside:
 
 ```bash
-# Terminal 1: Backend server (port 3000)
-npm run dev
-
-# Terminal 2: Vite dev server (port 5173)
-npm run client
+npm run dev:all   # Express on :9000 + Vite dev server on :5173
 ```
+
+Then open **http://localhost:5173/admin.html** for hot-reloaded UI development. The Express server on :9000 still serves the last built version.
 
 ### How It Works
 
-1. **Backend Server** (http://localhost:3000)
+1. **Express Server** (http://localhost:9000)
+   - Serves the built admin SPA from `dist/`
    - Serves content via REST API
    - Manages in-memory content store
    - Parses JSX files for source mapping
    - WebSocket for live updates
 
-2. **Vite Dev Server** (http://localhost:5173)
+2. **Admin SPA** (served by Express)
    - React app with live preview
    - Connects to backend via WebSocket
    - Real-time content updates

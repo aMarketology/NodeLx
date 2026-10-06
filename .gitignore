@@ -13,6 +13,9 @@ build/
 .env.local
 .env.production
 
+# Secrets — per-site GitHub PATs (never commit)
+content/.site-tokens.json
+
 # IDE
 .vscode/
 .idea/

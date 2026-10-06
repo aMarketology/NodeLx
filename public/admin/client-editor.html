@@ -3,32 +3,327 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NodeLx — Client Editor</title>
+  <title>NodeLx — Edit Site</title>
   <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0a;
+      --panel: #141414;
+      --border: #242424;
+      --text: #e5e5e5;
+      --muted: #888;
+      --dim: #555;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --green: #4ade80;
+      --red: #f87171;
+      --amber: #fbbf24;
+    }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #0a0a0a;
-      color: #e5e5e5;
-      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── 1. Admin Header Bar ─────────────────────────── */
+    .admin-bar {
       display: flex;
       align-items: center;
-      justify-content: center;
-      flex-direction: column;
+      justify-content: space-between;
       gap: 1rem;
+      padding: 0.6rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      background: #0d0d0d;
+      flex-shrink: 0;
+      height: 52px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
     }
-    h1 { font-size: 1.5rem; color: #3b82f6; }
-    p  { color: #555; font-size: 0.9rem; }
-    a  { color: #3b82f6; text-decoration: none; }
+    .bar-left { display: flex; align-items: center; gap: 0.5rem; }
+    .brand-dot { width: 9px; height: 9px; background: var(--accent); border-radius: 50%; }
+    .brand-name { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; }
+    .brand-name span { color: var(--accent); }
+    .page-badge {
+      font-size: 0.7rem; color: var(--muted); background: var(--panel);
+      border: 1px solid var(--border); border-radius: 999px; padding: 0.15rem 0.6rem;
+    }
+
+    .bar-center { display: flex; align-items: center; gap: 0.5rem; }
+    .mode-pill {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      padding: 0.25rem 0.7rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600;
+      background: rgba(59,130,246,0.12); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3);
+    }
+    .mode-pill::before {
+      content: ''; width: 7px; height: 7px; border-radius: 50%; background: #3b82f6;
+      animation: pulse 1.6s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+    .dirty-count {
+      font-size: 0.72rem; color: var(--amber); background: rgba(251,191,36,0.1);
+      border: 1px solid rgba(251,191,36,0.25); border-radius: 999px; padding: 0.15rem 0.55rem;
+      display: none;
+    }
+
+    .bar-right { display: flex; align-items: center; gap: 0.6rem; }
+    .save-status { font-size: 0.78rem; color: var(--muted); }
+    .save-status.ok { color: var(--green); }
+    .save-status.err { color: var(--red); }
+    .btn {
+      border: none; border-radius: 7px; padding: 0.45rem 0.9rem; font-size: 0.8rem;
+      font-weight: 600; cursor: pointer; transition: background 0.15s, opacity 0.15s;
+    }
+    .btn-save { background: var(--accent); color: #fff; }
+    .btn-save:hover:not(:disabled) { background: var(--accent-hover); }
+    .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-discard { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+    .btn-discard:hover:not(:disabled) { color: var(--text); border-color: var(--red); }
+    .btn-discard:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-logout { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+    .btn-logout:hover { color: var(--text); border-color: var(--accent); }
+    .user-chip { font-size: 0.75rem; color: var(--muted); display: flex; align-items: center; gap: 0.4rem; }
+    .user-avatar {
+      width: 26px; height: 26px; border-radius: 50%; background: #1f2937; color: var(--accent);
+      display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.7rem;
+      text-transform: uppercase;
+    }
+
+    /* ── 2. Target Iframe Viewer ─────────────────────── */
+    .iframe-wrap { flex: 1; position: relative; background: #000; overflow: hidden; }
+    .iframe-wrap iframe {
+      width: 100%; height: 100%; border: none; background: #fff;
+    }
+    .iframe-loading {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 0.75rem; color: var(--muted);
+      background: #0a0a0a; z-index: 5;
+    }
+    .spinner {
+      display: inline-block; width: 26px; height: 26px; border: 2px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .iframe-error {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 0.75rem; color: var(--red);
+      background: #0a0a0a; z-index: 6;
+    }
+    .iframe-error .retry {
+      background: var(--accent); color: #fff; border: none; border-radius: 7px;
+      padding: 0.5rem 1rem; font-size: 0.8rem; cursor: pointer;
+    }
   </style>
 </head>
 <body>
-  <h1>🔒 Client Editor</h1>
-  <p>Coming in Week 4 (Milestone 3).</p>
-  <p><a href="/admin/logout">Sign out</a></p>
+  <!-- ── 1. Admin Header Bar ─────────────────────────────── -->
+  <div class="admin-bar">
+    <div class="bar-left">
+      <div class="brand-dot"></div>
+      <div class="brand-name">Node<span>Lx</span></div>
+      <span class="page-badge" id="pageBadge">…</span>
+    </div>
+
+    <div class="bar-center">
+      <span class="mode-pill">Editing Mode</span>
+      <span class="dirty-count" id="dirtyCount"></span>
+    </div>
+
+    <div class="bar-right">
+      <span class="save-status" id="saveStatus"></span>
+      <button class="btn btn-save" id="saveBtn" disabled>Save Changes</button>
+      <button class="btn btn-discard" id="discardBtn" disabled>Discard</button>
+      <div class="user-chip">
+        <span class="user-avatar" id="userAvatar">?</span>
+        <span id="userEmail">…</span>
+      </div>
+      <a href="/admin/logout" class="btn btn-logout" id="logoutBtn">Logout</a>
+    </div>
+  </div>
+
+  <!-- ── 2. Target Iframe Viewer ─────────────────────────── -->
+  <div class="iframe-wrap" id="iframeWrap">
+    <div class="iframe-loading" id="iframeLoading">
+      <div class="spinner"></div>
+      <div>Loading site…</div>
+    </div>
+    <iframe id="targetFrame" title="Client site — editing mode"></iframe>
+  </div>
+
   <script>
-    // Verify auth — if not logged in, redirect to login
-    fetch('/api/auth/me', { credentials: 'include' })
-      .then(r => { if (!r.ok) window.location.href = '/admin/login'; });
+    (function () {
+      'use strict';
+
+      // ── State ─────────────────────────────────────────
+      var pageId = null;
+      var siteUrl = null;
+      var pending = {};        // key -> { value, tag }
+      var saving = false;
+
+      var $ = function (id) { return document.getElementById(id); };
+
+      // ── Bootstrap ─────────────────────────────────────
+      async function bootstrap() {
+        try {
+          var meRes = await fetch('/api/auth/me', { credentials: 'include' });
+          if (!meRes.ok) { window.location.href = '/admin/login'; return; }
+          var me = await meRes.json();
+          $('userEmail').textContent = me.email;
+          $('userAvatar').textContent = (me.email || '?').charAt(0).toUpperCase();
+
+          var params = new URLSearchParams(window.location.search);
+          pageId = params.get('page') || 'austin-crate-home';
+          $('pageBadge').textContent = pageId;
+
+          // Resolve the site's live URL
+          var ctxRes = await fetch('/api/editor/site?page=' + encodeURIComponent(pageId), { credentials: 'include' });
+          var ctx = await ctxRes.json();
+          siteUrl = ctx.previewUrl || 'https://williambconstruction.com';
+          loadSite();
+        } catch (err) {
+          console.error('[admin] bootstrap failed:', err);
+          showError('Could not load editor: ' + err.message);
+        }
+      }
+
+      // ── 2. Target iframe ──────────────────────────────
+      function loadSite() {
+        var frame = $('targetFrame');
+        var url = siteUrl;
+        // Append ?edit=true (preserve existing query params)
+        url += (url.includes('?') ? '&' : '?') + 'edit=true';
+        frame.src = url;
+        $('iframeLoading').style.display = 'flex';
+      }
+
+      function onFrameLoad() {
+        $('iframeLoading').style.display = 'none';
+      }
+
+      function showError(msg) {
+        var wrap = $('iframeWrap');
+        var err = document.createElement('div');
+        err.className = 'iframe-error';
+        err.innerHTML = '<div>⚠️ ' + escapeHtml(msg) + '</div>' +
+          '<button class="retry" id="retryBtn">Retry</button>';
+        wrap.appendChild(err);
+        var retry = err.querySelector('#retryBtn');
+        if (retry) retry.addEventListener('click', function () {
+          err.remove();
+          loadSite();
+        });
+      }
+
+      // ── 3. PostMessage listener ───────────────────────
+      window.addEventListener('message', function (e) {
+        var data = e.data;
+        if (!data || typeof data !== 'object') return;
+        if (data.type === 'CONTENT_CHANGED' && data.key) {
+          pending[data.key] = { value: data.value, tag: data.tag || 'text' };
+          updateDirtyUI();
+        }
+      });
+
+      function updateDirtyUI() {
+        var count = Object.keys(pending).length;
+        $('dirtyCount').textContent = count + ' unsaved';
+        $('dirtyCount').style.display = count > 0 ? 'inline-flex' : 'none';
+        $('saveBtn').disabled = count === 0 || saving;
+        $('discardBtn').disabled = count === 0 || saving;
+      }
+
+      // ── 4. Save & Commit handler ──────────────────────
+      async function saveChanges() {
+        var count = Object.keys(pending).length;
+        if (count === 0 || saving) return;
+
+        saving = true;
+        updateDirtyUI();
+        setStatus('Saving…');
+
+        // Tell the iframe we're saving (flash state)
+        postToFrame({ type: 'NODELX_SAVE' });
+
+                // Flatten pending to { key: value } — the content layer stores plain
+                // strings, not { value, tag } wrappers.
+                var payload = {};
+                Object.keys(pending).forEach(function (k) {
+                  payload[k] = pending[k].value;
+                });
+
+                try {
+                  var res = await fetch('/api/content/' + encodeURIComponent(pageId), {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(payload),
+                  });
+          var data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Save failed');
+
+          var commit = data._commit;
+          var revalidate = data._revalidate;
+          var msg = '✓ Saved' + (commit && commit.commitUrl ? ' · committed' : '');
+          if (data._gitWarning) msg += ' · git: ' + data._gitWarning;
+          if (revalidate && revalidate.status) msg += ' · revalidated';
+          setStatus(msg, false);
+
+          pending = {};
+          updateDirtyUI();
+          setTimeout(function () { setStatus(''); }, 4000);
+        } catch (err) {
+          setStatus('Error: ' + err.message, true);
+        } finally {
+          saving = false;
+          updateDirtyUI();
+        }
+      }
+
+      function discardChanges() {
+        if (saving) return;
+        pending = {};
+        updateDirtyUI();
+        postToFrame({ type: 'NODELX_DISCARD' });
+        setStatus('Discarded');
+        setTimeout(function () { setStatus(''); }, 2000);
+        // Reload the iframe to reset inline edits
+        loadSite();
+      }
+
+      function postToFrame(msg) {
+        var frame = $('targetFrame');
+        try {
+          if (frame.contentWindow) frame.contentWindow.postMessage(msg, '*');
+        } catch (err) {
+          // Cross-origin — ignore
+        }
+      }
+
+      function setStatus(msg, isErr) {
+        var el = $('saveStatus');
+        el.textContent = msg;
+        el.className = 'save-status' + (isErr ? ' err' : ' ok');
+      }
+
+      // ── Wiring ────────────────────────────────────────
+      $('saveBtn').addEventListener('click', saveChanges);
+      $('discardBtn').addEventListener('click', discardChanges);
+      $('targetFrame').addEventListener('load', onFrameLoad);
+
+      function escapeHtml(str) {
+        return String(str == null ? '' : str).replace(/[&<>"']/g, function (c) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+      }
+
+      bootstrap();
+    })();
   </script>
 </body>
 </html>

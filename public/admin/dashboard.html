@@ -310,9 +310,11 @@
 
       const cards = sites.map(site => {
         const initial = (site.name || '?').charAt(0).toUpperCase();
-        const adminUrl = site.adminUrl || '/admin/editor';
-        return '' +
-          '<a class="site-card" href="' + adminUrl + '">' +
+              // Link to the unified editor, scoped to this site's home page.
+              const pageId = site.pageId || (site.id + '-home');
+              const adminUrl = '/admin/editor?page=' + encodeURIComponent(pageId);
+              return '' +
+                '<a class="site-card" href="' + adminUrl + '">' +
             '<div class="site-thumb">' + initial + '</div>' +
             '<div class="site-body">' +
               '<div class="site-name">' + escapeHtml(site.name) + '</div>' +

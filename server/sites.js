@@ -85,9 +85,24 @@ const idFromRepo = (repo) => {
   return m[2].toLowerCase().replace(/_/g, '-');
 };
 
+/**
+ * Find a site whose pageId matches (explicit pageId, or `${id}-home`).
+ * @param {string} pageId
+ * @returns {object|null}
+ */
+const getSiteByPageId = (pageId) => {
+  const sites = getSites();
+  return (
+    sites.find((s) => s.pageId === pageId) ||
+    sites.find((s) => `${s.id}-home` === pageId) ||
+    null
+  );
+};
+
 module.exports = {
   getSites,
   getSiteById,
+  getSiteByPageId,
   upsertSite,
   deleteSite,
   idFromRepo,

@@ -86,8 +86,14 @@
         <input id="branch" placeholder="main" value="main" />
       </div>
 
-      <button class="btn" id="submitBtn">1 · Verify repo access</button>
-      <button class="btn secondary" id="saveBtn" style="display:none;">2 · Save this site</button>
+            <div class="field">
+              <label for="pat">GitHub PAT (fine-grained, Contents: read &amp; write)</label>
+              <input id="pat" type="password" placeholder="github_pat_…" autocomplete="off" />
+              <div class="hint">Stored locally in <code>content/.site-tokens.json</code> (gitignored). Never committed.</div>
+            </div>
+
+            <button class="btn" id="submitBtn">1 · Verify repo access</button>
+            <button class="btn secondary" id="saveBtn" style="display:none;">2 · Save this site</button>
 
       <ul class="steps">
         <li>Fine-grained PAT with <code>Contents: read &amp; write</code> on this repo</li>
@@ -102,67 +108,79 @@
     const nameInput   = document.getElementById('name');
     const liveUrlInput = document.getElementById('liveUrl');
     const branchInput = document.getElementById('branch');
-    const statusBox   = document.getElementById('status');
-    const submitBtn   = document.getElementById('submitBtn');
-    const saveBtn     = document.getElementById('saveBtn');
+        const patInput    = document.getElementById('pat');
+        const statusBox   = document.getElementById('status');
+        const submitBtn   = document.getElementById('submitBtn');
+        const saveBtn     = document.getElementById('saveBtn');
 
-    let lastVerified = null;
+        let lastVerified = null;
 
-    function show(msg, kind) {
-      statusBox.textContent = msg;
-      statusBox.className = 'status ' + kind;
-      statusBox.style.display = 'block';
-    }
-
-    function idFromRepo(repo) {
-      const m = /^[^/]+\/([^/]+)$/.exec(repo.trim());
-      return m ? m[1].toLowerCase().replace(/_/g, '-') : repo.toLowerCase().replace(/_/g, '-');
-    }
-
-    submitBtn.addEventListener('click', async () => {
-      const repo = repoInput.value.trim();
-      if (!/^[^/]+\/[^/]+$/.test(repo)) {
-        return show('Please enter a valid "owner/repo".', 'err');
-      }
-
-      const id = idFromRepo(repo);
-      if (!nameInput.value.trim()) nameInput.value = id.replace(/-/g, ' ');
-
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Verifying…';
-      saveBtn.style.display = 'none';
-      show('Checking repo access…', 'warn');
-
-      try {
-        const res = await fetch(`/api/sites/${encodeURIComponent(id)}/verify`, { credentials: 'include' });
-        const data = await res.json();
-
-        if (res.ok && data.ok) {
-          lastVerified = { repo, verified: true, defaultBranch: data.defaultBranch };
-          if (data.defaultBranch) branchInput.value = data.defaultBranch;
-          show(`✓ Access confirmed — ${data.fullName}`, 'ok');
-          submitBtn.style.display = 'none';
-          saveBtn.style.display = 'block';
-        } else {
-          lastVerified = { repo, verified: false };
-          show('⚠ ' + (data.error || data.message || 'Verification failed'), 'err');
-          submitBtn.disabled = false;
-          submitBtn.textContent = '1 · Verify repo access';
+        function show(msg, kind) {
+          statusBox.textContent = msg;
+          statusBox.className = 'status ' + kind;
+          statusBox.style.display = 'block';
         }
-      } catch (err) {
-        show('Network error: ' + err.message, 'err');
-        submitBtn.disabled = false;
-        submitBtn.textContent = '1 · Verify repo access';
-      }
-    });
 
-    saveBtn.addEventListener('click', async () => {
-      const payload = {
-        repo: repoInput.value.trim(),
-        name: nameInput.value.trim(),
-        liveUrl: liveUrlInput.value.trim(),
-        branch: branchInput.value.trim() || 'main',
-      };
+        function idFromRepo(repo) {
+          const m = /^[^/]+\/([^/]+)$/.exec(repo.trim());
+          return m ? m[1].toLowerCase().replace(/_/g, '-') : repo.toLowerCase().replace(/_/g, '-');
+        }
+
+        submitBtn.addEventListener('click', async () => {
+          const repo = repoInput.value.trim();
+          if (!/^[^/]+\/[^/]+$/.test(repo)) {
+            return show('Please enter a valid "owner/repo".', 'err');
+          }
+
+          const pat = patInput.value.trim();
+          if (!pat) {
+            return show('Please enter the GitHub PAT for this repo.', 'err');
+          }
+
+          const id = idFromRepo(repo);
+          if (!nameInput.value.trim()) nameInput.value = id.replace(/-/g, ' ');
+
+          submitBtn.disabled = true;
+          submitBtn.textContent = 'Verifying…';
+          saveBtn.style.display = 'none';
+          show('Checking repo access…', 'warn');
+
+          try {
+            const res = await fetch(`/api/sites/${encodeURIComponent(id)}/verify`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ pat }),
+            });
+            const data = await res.json();
+
+            if (res.ok && data.ok) {
+              lastVerified = { repo, verified: true, defaultBranch: data.defaultBranch };
+              if (data.defaultBranch) branchInput.value = data.defaultBranch;
+              show(`✓ Access confirmed — ${data.fullName}`, 'ok');
+              submitBtn.style.display = 'none';
+              saveBtn.style.display = 'block';
+            } else {
+              lastVerified = { repo, verified: false };
+              show('⚠ ' + (data.error || data.message || 'Verification failed'), 'err');
+              submitBtn.disabled = false;
+              submitBtn.textContent = '1 · Verify repo access';
+            }
+          } catch (err) {
+            show('Network error: ' + err.message, 'err');
+            submitBtn.disabled = false;
+            submitBtn.textContent = '1 · Verify repo access';
+          }
+        });
+
+        saveBtn.addEventListener('click', async () => {
+          const payload = {
+            repo: repoInput.value.trim(),
+            name: nameInput.value.trim(),
+            liveUrl: liveUrlInput.value.trim(),
+            branch: branchInput.value.trim() || 'main',
+            pat: patInput.value.trim(),
+          };
 
       saveBtn.disabled = true;
       saveBtn.textContent = 'Saving…';

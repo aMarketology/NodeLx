@@ -37,16 +37,19 @@ class ContentStore {
       const files = await fs.readdir(this.contentDir);
 
       for (const file of files) {
-        if (file.endsWith('.json')) {
+          // Skip dotfiles (e.g. .site-tokens.json) and NodeLx's own config files
+          // (sites.json, theme.json, users.json) — only load page content files.
+          if (!file.endsWith('.json')) continue;
+          if (file.startsWith('.')) continue;
+          if (['sites.json', 'theme.json', 'users.json'].includes(file)) continue;
           await this.loadContentFile(file);
         }
-      }
 
-      console.log(`[ContentStore] Loaded ${this.store.size} content files`);
-    } catch (error) {
-      console.error('[ContentStore] Error loading content:', error);
+        console.log(`[ContentStore] Loaded ${this.store.size} content files`);
+      } catch (error) {
+        console.error('[ContentStore] Error loading content:', error);
+      }
     }
-  }
 
   /**
    * Load a single content file
@@ -75,20 +78,24 @@ class ContentStore {
   startWatching() {
     this.watcher = chokidar.watch(`${this.contentDir}/*.json`, {
       persistent: true,
-      ignoreInitial: true
-    });
+        ignoreInitial: true,
+        ignored: (p) => {
+          const name = path.basename(p);
+          return name.startsWith('.') || ['sites.json', 'theme.json', 'users.json'].includes(name);
+        },
+      });
 
-    this.watcher
-      .on('add', (filePath) => {
-        const filename = path.basename(filePath);
-        console.log(`[ContentStore] File added: ${filename}`);
-        this.loadContentFile(filename);
-      })
-      .on('change', (filePath) => {
-        const filename = path.basename(filePath);
-        console.log(`[ContentStore] File changed: ${filename}`);
-        this.loadContentFile(filename);
-      })
+      this.watcher
+        .on('add', (filePath) => {
+          const filename = path.basename(filePath);
+          console.log(`[ContentStore] File added: ${filename}`);
+          this.loadContentFile(filename);
+        })
+        .on('change', (filePath) => {
+          const filename = path.basename(filePath);
+          console.log(`[ContentStore] File changed: ${filename}`);
+          this.loadContentFile(filename);
+        })
       .on('unlink', (filePath) => {
         const filename = path.basename(filePath);
         const pageId = filename.replace('.json', '');
@@ -114,46 +121,69 @@ class ContentStore {
 
   /**
    * Update content for a page
-   */
-  async updateContent(pageId, updates) {
-    const existing = this.store.get(pageId);
+     * Creates the page file if it doesn't exist yet (bootstrap for newly
+     * onboarded sites whose content file hasn't been committed yet).
+       *
+       * `updates` may contain dot-notation paths (e.g. "hero.badge",
+       * "projects.0.title", "hero.h1_0") matching the client site's
+       * data-editable ids. These are applied onto the nested content tree.
+       */
+      async updateContent(pageId, updates) {
+        const existing = this.store.get(pageId);
 
-    if (!existing) {
-      throw new Error(`Page ${pageId} not found`);
-    }
+        let updated;
+        if (!existing) {
+          updated = {
+            pageId,
+            content: { ...updates },
+            metadata: {
+              lastModified: new Date().toISOString(),
+              author: 'system',
+            },
+          };
+        } else {
+          // Deep-clone existing content so we can apply nested mutations
+          const base = JSON.parse(JSON.stringify(existing.content || {}));
 
-    // Merge updates with existing content
-    const updated = {
-      ...existing,
-      content: {
-        ...existing.content,
-        ...updates
-      },
-      metadata: {
-        ...existing.metadata,
-        lastModified: new Date().toISOString()
-      }
-    };
+          // Apply each update. Dot-notation paths are resolved onto the tree;
+          // plain keys are merged at the top level.
+          for (const [key, value] of Object.entries(updates)) {
+            if (key.includes('.')) {
+              applyPath(base, key, value);
+            } else {
+              base[key] = value;
+            }
+          }
 
-    // Update in-memory store
-    this.store.set(pageId, updated);
+          updated = {
+            ...existing,
+            content: base,
+            metadata: {
+              ...existing.metadata,
+              lastModified: new Date().toISOString()
+            }
+          };
+        }
 
-    // Write to file
-    const filename = `${pageId}.json`;
-    const filePath = path.join(this.contentDir, filename);
-    await fs.writeFile(filePath, JSON.stringify(updated, null, 2));
+        // Update in-memory store
+                this.store.set(pageId, updated);
 
-    console.log(`[ContentStore] Updated: ${pageId}`);
+                // Write to file
+                const filename = `${pageId}.json`;
+                const filePath = path.join(this.contentDir, filename);
+                await fs.writeFile(filePath, JSON.stringify(updated, null, 2));
 
-    // Notify subscribers
-    this.notifySubscribers({ type: 'update', pageId, data: updated });
+                console.log(`[ContentStore] Updated: ${pageId}`);
 
-    return updated;
-  }
+                // Notify subscribers
+                this.notifySubscribers({ type: 'update', pageId, data: updated });
 
-  /**
-   * Subscribe to content changes
-   */
+                return updated;
+              }
+
+          /**
+           * Subscribe to content changes
+           */
   subscribe(callback) {
     this.subscribers.add(callback);
 
@@ -188,4 +218,46 @@ class ContentStore {
   }
 }
 
-module.exports = ContentStore;
+  /**
+   * Apply a dot-notation path onto a nested object.
+   * Handles:
+   *   - "hero.badge"       → obj.hero.badge
+   *   - "hero.h1_0"        → obj.hero.h1[0]   (h1_N → array index)
+   *   - "projects.0.title" → obj.projects[0].title
+   *   - "stats.2.val"      → obj.stats[2].val
+   */
+  function applyPath(obj, path, value) {
+    const segments = path.split('.');
+    let cursor = obj;
+
+    for (let i = 0; i < segments.length - 1; i++) {
+      const seg = segments[i];
+
+      // "h1_0" → array "h1" index 0
+      const arrayMatch = /^(.+)_(\d+)$/.exec(seg);
+      if (arrayMatch && Array.isArray(cursor[arrayMatch[1]])) {
+        cursor = cursor[arrayMatch[1]][Number(arrayMatch[2])];
+        continue;
+      }
+
+      // numeric segment → array index
+      if (/^\d+$/.test(seg) && Array.isArray(cursor)) {
+        cursor = cursor[Number(seg)];
+        continue;
+      }
+
+      cursor = cursor[seg];
+      if (cursor === undefined || cursor === null) return;
+    }
+
+    const last = segments[segments.length - 1];
+    const lastArrayMatch = /^(.+)_(\d+)$/.exec(last);
+    if (lastArrayMatch && Array.isArray(cursor[lastArrayMatch[1]])) {
+      cursor[lastArrayMatch[1]][Number(lastArrayMatch[2])] = value;
+      return;
+    }
+
+    cursor[last] = value;
+  }
+
+  module.exports = ContentStore;

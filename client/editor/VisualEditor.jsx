@@ -11,7 +11,7 @@ import './VisualEditor.css';
  * 4. Communicates with the AST API to modify source code
  */
 
-const API_BASE = 'http://localhost:3001';
+const API_BASE = 'http://localhost:9000';
 
 export default function VisualEditor({ targetUrl = 'http://localhost:3000', projectPath }) {
   // State
@@ -68,7 +68,7 @@ export default function VisualEditor({ targetUrl = 'http://localhost:3000', proj
 
   // Setup WebSocket for real-time updates
   const setupWebSocket = () => {
-    const ws = new WebSocket('ws://localhost:3001');
+    const ws = new WebSocket('ws://localhost:9000');
     
     ws.onopen = () => {
       console.log('[VisualEditor] WebSocket connected');

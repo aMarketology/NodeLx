@@ -1,11 +1,14 @@
 const { Octokit } = require('@octokit/rest');
+const { getToken } = require('./siteTokens');
 
 /**
  * GitSync — pushes content files to any GitHub repository so a stateless
  * deployment (e.g. Vercel) can rebuild on every commit.
  *
- * The PAT never touches the React frontend. It lives only in the server env
- * as GITHUB_PAT (a fine-grained token with "Contents: Read/write").
+ * The PAT never touches the React frontend. It lives either:
+ *   - per-site, in content/.site-tokens.json (gitignored), collected during
+ *     onboarding, OR
+ *   - globally, in the server env as GITHUB_PAT.
  *
  * Every operation is scoped to an explicit { owner, repo, branch } so a single
  * NodeLx deployment can manage many client sites.
@@ -18,6 +21,27 @@ class GitSync {
 
   isConfigured() {
     return Boolean(this.token && this.octokit);
+  }
+
+  /**
+   * Resolve the effective token for a site: per-site token wins, else env.
+     * @param {object} site { id, repo, owner?, repoName?, branch?, _pat? }
+   * @returns {string}
+   */
+  resolveToken(site = {}) {
+      if (site._pat) return site._pat; // one-off token from onboarding verify
+      const siteToken = site.id ? getToken(site.id) : null;
+      return siteToken || this.token;
+    }
+
+  /**
+   * Build an Octokit client for a specific site (per-site token aware).
+   * @param {object} site
+   * @returns {Octokit|null}
+   */
+  clientFor(site = {}) {
+    const token = this.resolveToken(site);
+    return token ? new Octokit({ auth: token }) : null;
   }
 
   /**
@@ -38,16 +62,18 @@ class GitSync {
 
   /**
    * Verify the PAT can read a repo (used by onboarding connectivity check).
+   * Uses the per-site token if provided, else the env token.
    * @param {object} site
    * @returns {Promise<{ok, fullName?, defaultBranch?, error?}>}
    */
   async verifyRepo(site = {}) {
-    if (!this.isConfigured()) {
-      return { ok: false, error: 'GITHUB_PAT is not configured on the server' };
+    const client = this.clientFor(site);
+    if (!client) {
+      return { ok: false, error: 'No GitHub token configured for this site' };
     }
     const { owner, repo } = this.resolveTarget(site);
     try {
-      const { data } = await this.octokit.repos.get({ owner, repo });
+      const { data } = await client.repos.get({ owner, repo });
       return { ok: true, fullName: data.full_name, defaultBranch: data.default_branch };
     } catch (err) {
       return {
@@ -62,9 +88,9 @@ class GitSync {
   /**
    * Get the SHA of an existing file, or null if it doesn't exist.
    */
-  async getFileSha(owner, repo, branch, path) {
+  async getFileSha(client, owner, repo, branch, path) {
     try {
-      const { data } = await this.octokit.repos.getContent({ owner, repo, path, ref: branch });
+      const { data } = await client.repos.getContent({ owner, repo, path, ref: branch });
       return data.sha || null;
     } catch (err) {
       if (err.status === 404) return null;
@@ -82,15 +108,16 @@ class GitSync {
    * @returns {Promise<{path, sha, commitUrl}>}
    */
   async commitFile(site, repoPath, content, message) {
-    if (!this.isConfigured()) {
-      throw new Error('GITHUB_PAT is not configured on the server');
+    const client = this.clientFor(site);
+    if (!client) {
+      throw new Error('No GitHub token configured for this site');
     }
 
     const { owner, repo, branch } = this.resolveTarget(site);
     const path = repoPath.replace(/^\/+/, '');
 
-    const existingSha = await this.getFileSha(owner, repo, branch, path);
-    const { data } = await this.octokit.repos.createOrUpdateFileContents({
+    const existingSha = await this.getFileSha(client, owner, repo, branch, path);
+    const { data } = await client.repos.createOrUpdateFileContents({
       owner,
       repo,
       path,
