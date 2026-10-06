@@ -17,6 +17,9 @@
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+    "engines": {
+      "node": ">=20.19.0"
+    },
   "dependencies": {
       "@octokit/rest": "^21.0.2",
       "@supabase/supabase-js": "^2.84.0",

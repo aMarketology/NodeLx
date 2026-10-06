@@ -1,0 +1,9 @@
+# Nixpacks build config — pin Node 22 (Vite 7 requires >= 20.19)
+[phases.setup]
+nixPkgs = ["nodejs_22"]
+
+[phases.build]
+cmds = ["npm ci", "npm run build"]
+
+[start]
+cmd = "npm start"
