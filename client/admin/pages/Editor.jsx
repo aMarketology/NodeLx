@@ -58,9 +58,10 @@ export default function Editor() {
   const [pending, setPending] = useState({});   // id -> value (dot-notation)
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState({ msg: '', kind: '' });
+    const [diagnosis, setDiagnosis] = useState(null); // CSP verdict
 
-  const dirtyCount = Object.keys(pending).length;
-  const activeUrl = mode === 'live' ? liveUrl : localUrl;
+    const dirtyCount = Object.keys(pending).length;
+    const activeUrl = mode === 'live' ? liveUrl : localUrl;
 
   // Bootstrap: resolve site + live URL + token status.
   useEffect(() => {
@@ -91,6 +92,19 @@ export default function Editor() {
       }
     })();
   }, [site]);
+
+    // Diagnose the client site's CSP (frame-ancestors) to surface iframe blocking.
+    useEffect(() => {
+      if (!site) return;
+      (async () => {
+        try {
+          const d = await api.diagnoseEditor(pageId);
+          setDiagnosis(d);
+        } catch (err) {
+          setDiagnosis({ ok: false, error: err.message });
+        }
+      })();
+    }, [site, pageId]);
 
   const postToFrame = useCallback((msg) => {
     try {
@@ -333,12 +347,25 @@ export default function Editor() {
               <div className="iframe-warning-sub">Edits can't be committed. Add a PAT via onboarding or set GITHUB_PAT.</div>
             </div>
           )}
-          <iframe
-            ref={frameRef}
-            title="Client site — editing mode"
-            className={!hasToken ? 'iframe-disabled' : ''}
-            onLoad={() => setLoading(false)}
-          />
+                    {diagnosis && !diagnosis.ok && (
+                      <div className="iframe-warning">
+                        <div>⚠️ Diagnose failed: {diagnosis.error}</div>
+                      </div>
+                    )}
+                    {diagnosis && diagnosis.ok && diagnosis.verdict && diagnosis.verdict.startsWith('BLOCKED') && (
+                      <div className="iframe-warning">
+                        <div>🚫 {diagnosis.verdict}</div>
+                        <div className="iframe-warning-sub">
+                          Current CSP: <code>{diagnosis.csp}</code>
+                        </div>
+                      </div>
+                    )}
+                    <iframe
+                      ref={frameRef}
+                      title="Client site — editing mode"
+                      className={!hasToken ? 'iframe-disabled' : ''}
+                      onLoad={() => setLoading(false)}
+                    />
         </div>
       </div>
     </div>

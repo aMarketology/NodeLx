@@ -60,6 +60,8 @@ export const api = {
       }),
 
     // ── Editor bridge (cookie auth) — read/write the client's GitHub content ──
+    // Diagnose the client site's CSP (frame-ancestors) to see if NodeLx can iframe it.
+    diagnoseEditor: (pageId) => request(`/api/editor/diagnose?page=${encodeURIComponent(pageId)}`),
     // Read the client's content/<page>.json from GitHub (for the editor sidebar).
     readEditorContent: (siteId, page) =>
       request(`/api/editor/content/${encodeURIComponent(siteId)}/${encodeURIComponent(page)}`),

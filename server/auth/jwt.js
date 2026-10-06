@@ -29,16 +29,20 @@ const verifyToken = (token) => {
 };
 
 /**
- * Set an HTTP-only auth cookie on the response
+ * Set an HTTP-only auth cookie on the response.
+ * `secure` is set only when the request itself is HTTPS (so local HTTP dev
+ * still works even when NODE_ENV=production). `sameSite` is 'lax' to allow
+ * the cookie to flow to the iframe'd client site.
  * @param {import('express').Response} res
  * @param {object} payload - { id, email, role }
  */
 const setAuthCookie = (res, payload) => {
   const token = signToken(payload);
+  const isHttps = res.req?.secure || res.req?.headers?.['x-forwarded-proto'] === 'https';
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+    secure: isHttps,
+    sameSite: 'lax',
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
   });
 };

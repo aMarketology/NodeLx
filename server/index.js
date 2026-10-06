@@ -137,6 +137,42 @@ class NodeLxServer {
           });
         });
 
+        // Diagnostic: check the client site's CSP frame-ancestors header to see if
+        // it allows NodeLx to iframe it. Returns the raw header + a verdict.
+        this.app.get('/api/editor/diagnose', async (req, res) => {
+          const pageId = req.query.page || '';
+          const site = pageId ? getSiteByPageId(pageId) : null;
+          if (!site || !site.liveUrl) {
+            return res.json({ ok: false, error: 'No site/liveUrl for this page' });
+          }
+
+          const nodelxOrigin = req.headers.origin || `https://${req.headers.host}`;
+          try {
+            const r = await fetch(site.liveUrl, { redirect: 'follow' });
+            const csp = r.headers.get('content-security-policy') || '';
+            const xfo = r.headers.get('x-frame-options') || '';
+            const frameAncestors = /frame-ancestors\s+([^;]+)/i.exec(csp)?.[1]?.trim() || '';
+            const allowed = frameAncestors.split(/\s+/).filter(Boolean);
+            const allowsSelf = allowed.includes("'self'");
+            const allowsNodelx = allowed.some((o) => nodelxOrigin.includes(o.replace(/^https?:\/\//, '')) || o.includes(nodelxOrigin.replace(/^https?:\/\//, '')));
+
+            res.json({
+              ok: true,
+              site: site.id,
+              liveUrl: site.liveUrl,
+              nodelxOrigin,
+              csp,
+              xFrameOptions: xfo,
+              frameAncestors: allowed,
+              verdict: allowsNodelx
+                ? 'OK — NodeLx origin is allowed'
+                : `BLOCKED — frame-ancestors does not include NodeLx origin (${nodelxOrigin}). Set NODELX_URL on the client's Vercel deployment and redeploy.`,
+            });
+          } catch (err) {
+            res.json({ ok: false, error: err.message });
+          }
+        });
+
     // Update content (authenticated client/developer)
     this.app.patch('/api/content/:pageId', async (req, res) => {
       try {
