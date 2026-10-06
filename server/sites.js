@@ -74,6 +74,27 @@ const deleteSite = (id) => {
 };
 
 /**
+ * Update specific fields on a site (e.g. liveUrl) and persist.
+ * @param {string} id
+ * @param {object} fields partial site object
+ * @returns {object|null} the updated site, or null if not found
+ */
+const updateSite = (id, fields) => {
+  const sites = getSites();
+  const idx = sites.findIndex((s) => s.id === id);
+  if (idx < 0) return null;
+
+  const updated = {
+    ...sites[idx],
+    ...fields,
+    lastEdited: new Date().toISOString(),
+  };
+  sites[idx] = updated;
+  saveSites(sites);
+  return updated;
+};
+
+/**
  * Derive a stable site id from a GitHub "owner/repo" string.
  * Repos may use `-` or `_`; normalize to hyphens.
  * @param {string} repo "owner/repo"
@@ -104,6 +125,7 @@ module.exports = {
   getSiteById,
   getSiteByPageId,
   upsertSite,
+  updateSite,
   deleteSite,
   idFromRepo,
 };

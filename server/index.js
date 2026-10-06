@@ -12,6 +12,8 @@ const adminRoutes   = require('./routes/admin');
 const sitesRoutes   = require('./routes/sites');
 const mediaRoutes   = require('./routes/media');
 const { getSiteByPageId } = require('./sites');
+const { getToken } = require('./siteTokens');
+const { callRevalidate } = require('./revalidate');
 const { verifyToken, COOKIE_NAME } = require('./auth/jwt');
 const GitSync = require('./gitSync');
 
@@ -126,12 +128,14 @@ class NodeLxServer {
     this.app.get('/api/editor/site', (req, res) => {
       const pageId = req.query.page || '';
       const site = pageId ? getSiteByPageId(pageId) : null;
-      res.json({
-        pageId: pageId || null,
-        site: site || null,
-        previewUrl: site?.liveUrl || null,
-      });
-    });
+          const hasToken = site ? Boolean(getToken(site.id) || process.env.GITHUB_PAT) : false;
+          res.json({
+            pageId: pageId || null,
+            site: site || null,
+            previewUrl: site?.liveUrl || null,
+            hasToken,
+          });
+        });
 
     // Update content (authenticated client/developer)
     this.app.patch('/api/content/:pageId', async (req, res) => {
@@ -161,19 +165,13 @@ class NodeLxServer {
         }
 
         // Flush the live site's ISR cache so the edit goes live in seconds.
-        if (site && site.liveUrl) {
-          try {
-            const base = site.liveUrl.replace(/\/$/, '');
-            const r = await fetch(`${base}/api/revalidate`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ paths: ['/'] }),
-            });
-            updated._revalidate = { status: r.status };
-          } catch (err) {
-            updated._revalidate = { error: err.message };
-          }
-        }
+                if (site && site.liveUrl) {
+                  try {
+                    updated._revalidate = await callRevalidate(site.liveUrl, ['/']);
+                  } catch (err) {
+                    updated._revalidate = { error: err.message };
+                  }
+                }
 
         res.json(updated);
       } catch (error) {

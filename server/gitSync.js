@@ -99,15 +99,33 @@ class GitSync {
   }
 
   /**
-   * Create or update a single file, committing it to the target branch.
-   *
-   * @param {object} site site object (repo/owner/repoName/branch)
-   * @param {string} repoPath path inside the repo (e.g. "content/home.json")
-   * @param {string} content raw file contents
-   * @param {string} message commit message
-   * @returns {Promise<{path, sha, commitUrl}>}
-   */
-  async commitFile(site, repoPath, content, message) {
+     * Read a file's raw contents from the repo (base64-decoded).
+     * @param {object} site site object
+     * @param {string} repoPath path inside the repo (e.g. "content/home.json")
+     * @returns {Promise<{content: string, sha: string}>}
+     */
+    async readFile(site, repoPath) {
+      const client = this.clientFor(site);
+      if (!client) {
+        throw new Error('No GitHub token configured for this site');
+      }
+      const { owner, repo, branch } = this.resolveTarget(site);
+      const path = repoPath.replace(/^\/+/, '');
+      const { data } = await client.repos.getContent({ owner, repo, path, ref: branch });
+      const content = Buffer.from(data.content, 'base64').toString('utf-8');
+      return { content, sha: data.sha };
+    }
+
+    /**
+     * Create or update a single file, committing it to the target branch.
+     *
+     * @param {object} site site object (repo/owner/repoName/branch)
+     * @param {string} repoPath path inside the repo (e.g. "content/home.json")
+     * @param {string} content raw file contents
+     * @param {string} message commit message
+     * @returns {Promise<{path, sha, commitUrl}>}
+     */
+    async commitFile(site, repoPath, content, message) {
     const client = this.clientFor(site);
     if (!client) {
       throw new Error('No GitHub token configured for this site');

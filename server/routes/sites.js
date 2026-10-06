@@ -1,6 +1,7 @@
 const express = require('express');
-const { getSites, getSiteById, upsertSite, deleteSite, idFromRepo } = require('../sites');
-const { setToken, removeToken } = require('../siteTokens');
+const { getSites, getSiteById, upsertSite, updateSite, deleteSite, idFromRepo } = require('../sites');
+const { setToken, removeToken, getToken } = require('../siteTokens');
+const { callRevalidate } = require('../revalidate');
 const { requireAuth, requireRole } = require('../auth/middleware');
 
 const router = express.Router();
@@ -105,24 +106,105 @@ module.exports = function sitesRouter(gitSync) {
     res.json({ site });
   });
 
-  // DELETE /api/sites/:id → remove a site
-  router.delete('/api/sites/:id', requireAuth, requireRole('developer'), (req, res) => {
-    const ok = deleteSite(req.params.id);
-    if (!ok) return res.status(404).json({ error: 'Site not found' });
-    res.json({ ok: true });
-  });
+    // PATCH /api/sites/:id → update site fields (e.g. liveUrl)
+    router.patch('/api/sites/:id', requireAuth, requireRole('developer'), (req, res) => {
+      const { liveUrl, name, subtitle, branch } = req.body || {};
+      const fields = {};
+      if (liveUrl !== undefined) fields.liveUrl = liveUrl;
+      if (name !== undefined) fields.name = name;
+      if (subtitle !== undefined) fields.subtitle = subtitle;
+      if (branch !== undefined) fields.branch = branch;
+
+      const site = updateSite(req.params.id, fields);
+      if (!site) return res.status(404).json({ error: 'Site not found' });
+      res.json({ site });
+    });
+
+    // DELETE /api/sites/:id → remove a site
+    router.delete('/api/sites/:id', requireAuth, requireRole('developer'), (req, res) => {
+      const ok = deleteSite(req.params.id);
+      if (!ok) return res.status(404).json({ error: 'Site not found' });
+      res.json({ ok: true });
+    });
 
   // ─── Client bridge (NODELX_API_KEY) ──────────────────────────────────────
   // Matches the client repo's saveHome() contract:
   //   PUT /api/sites/:siteId/content/:page
   //   Authorization: Bearer <NODELX_API_KEY>
   //   Body: { content, authorEmail, revalidatePaths }
-  router.put('/api/sites/:id/content/:page', sync, requireApiKey, async (req, res) => {
-    const site = getSiteById(req.params.id);
-    if (!site) return res.status(404).json({ error: `Unknown site: ${req.params.id}` });
+  // ─── Editor bridge (cookie auth, developer) ──────────────────────────────
+    // The NodeLx editor reads/writes the client's content/<page>.json via these
+    // cookie-authenticated endpoints (the API-key bridge below is for the
+    // client's own admin panel).
 
-    const page = req.params.page.replace(/[^a-zA-Z0-9_-]/g, '');
-    const { content, authorEmail, revalidatePaths = [] } = req.body || {};
+    // GET /api/editor/content/:siteId/:page → read current content from GitHub
+    router.get('/api/editor/content/:siteId/:page', requireAuth, requireRole('developer'), sync, async (req, res) => {
+      const site = getSiteById(req.params.siteId);
+      if (!site) return res.status(404).json({ error: `Unknown site: ${req.params.siteId}` });
+
+      const page = req.params.page.replace(/[^a-zA-Z0-9_-]/g, '');
+      try {
+        const { content, sha } = await req.gitSync.readFile(site, `content/${page}.json`);
+        res.json({ ok: true, content: JSON.parse(content), sha });
+      } catch (err) {
+        res.status(500).json({ error: err.message });
+      }
+    });
+
+    // PUT /api/editor/content/:siteId/:page → commit content to GitHub + revalidate
+    router.put('/api/editor/content/:siteId/:page', requireAuth, requireRole('developer'), sync, async (req, res) => {
+      const site = getSiteById(req.params.siteId);
+      if (!site) return res.status(404).json({ error: `Unknown site: ${req.params.siteId}` });
+
+      const page = req.params.page.replace(/[^a-zA-Z0-9_-]/g, '');
+      const { content, authorEmail, revalidatePaths = [] } = req.body || {};
+
+      if (content === undefined || content === null) {
+        return res.status(400).json({ error: 'content is required' });
+      }
+
+      try {
+        const repoPath = `content/${page}.json`;
+        const body = JSON.stringify(content, null, 2);
+        const commit = await req.gitSync.commitFile(
+          site,
+          repoPath,
+          body,
+          `content: update ${page}.json${authorEmail ? ` by ${authorEmail}` : ''}`
+        );
+
+        const revalidateResults =
+          site.liveUrl && Array.isArray(revalidatePaths) && revalidatePaths.length
+            ? await callRevalidate(site.liveUrl, revalidatePaths)
+            : [];
+
+        res.json({ ok: true, commit, revalidate: revalidateResults });
+      } catch (err) {
+        res.status(500).json({ error: err.message });
+      }
+    });
+
+    // GET /api/sites/:id/content/:page → read current content from GitHub
+      // (used by the NodeLx editor to load current values for the sidebar).
+      router.get('/api/sites/:id/content/:page', sync, requireApiKey, async (req, res) => {
+      const site = getSiteById(req.params.id);
+      if (!site) return res.status(404).json({ error: `Unknown site: ${req.params.id}` });
+
+      const page = req.params.page.replace(/[^a-zA-Z0-9_-]/g, '');
+      try {
+        const { content, sha } = await req.gitSync.readFile(site, `content/${page}.json`);
+        res.json({ ok: true, content: JSON.parse(content), sha });
+      } catch (err) {
+        res.status(500).json({ error: err.message });
+      }
+    });
+
+    router.put('/api/sites/:id/content/:page', sync, requireApiKey, async (req, res) => {
+      const site = getSiteById(req.params.id);
+      if (!site) return res.status(404).json({ error: `Unknown site: ${req.params.id}` });
+
+      const page = req.params.page.replace(/[^a-zA-Z0-9_-]/g, '');
+      const { content, authorEmail, revalidatePaths = [] } = req.body || {};
 
     if (content === undefined || content === null) {
       return res.status(400).json({ error: 'content is required' });
@@ -139,24 +221,12 @@ module.exports = function sitesRouter(gitSync) {
       );
 
       // Flush the live site's ISR cache so the edit goes live in seconds.
-      const revalidateResults = [];
-      if (site.liveUrl && Array.isArray(revalidatePaths) && revalidatePaths.length) {
-        for (const p of revalidatePaths) {
-          try {
-            const base = (site.liveUrl || '').replace(/\/$/, '');
-            const r = await fetch(`${base}/api/revalidate`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ paths: [p] }),
-            });
-            revalidateResults.push({ path: p, status: r.status });
-          } catch (err) {
-            revalidateResults.push({ path: p, error: err.message });
-          }
-        }
-      }
+            const revalidateResults =
+              site.liveUrl && Array.isArray(revalidatePaths) && revalidatePaths.length
+                ? await callRevalidate(site.liveUrl, revalidatePaths)
+                : [];
 
-      res.json({ ok: true, commit, revalidate: revalidateResults });
+            res.json({ ok: true, commit, revalidate: revalidateResults });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }

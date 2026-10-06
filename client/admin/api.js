@@ -44,13 +44,29 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ pat }),
       }),
+    updateSite: (id, fields) =>
+      request(`/api/sites/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(fields),
+      }),
     deleteSite: (id) => request(`/api/sites/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
   // ── Editor ────────────────────────────────────────────
-  editorContext: (pageId) => request(`/api/editor/site?page=${encodeURIComponent(pageId)}`),
-  saveContent: (pageId, payload) =>
-    request(`/api/content/${encodeURIComponent(pageId)}`, {
-      method: 'PATCH',
-      body: JSON.stringify(payload),
-    }),
-};
+    editorContext: (pageId) => request(`/api/editor/site?page=${encodeURIComponent(pageId)}`),
+    saveContent: (pageId, payload) =>
+      request(`/api/content/${encodeURIComponent(pageId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      }),
+
+    // ── Editor bridge (cookie auth) — read/write the client's GitHub content ──
+    // Read the client's content/<page>.json from GitHub (for the editor sidebar).
+    readEditorContent: (siteId, page) =>
+      request(`/api/editor/content/${encodeURIComponent(siteId)}/${encodeURIComponent(page)}`),
+    // Publish the full content object back to the client repo (commit + revalidate).
+    publishEditorContent: (siteId, page, content, authorEmail) =>
+      request(`/api/editor/content/${encodeURIComponent(siteId)}/${encodeURIComponent(page)}`, {
+        method: 'PUT',
+        body: JSON.stringify({ content, authorEmail, revalidatePaths: ['/'] }),
+      }),
+  };
