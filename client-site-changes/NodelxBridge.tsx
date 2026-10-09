@@ -3,41 +3,25 @@
 /**
  * NodelxBridge.tsx — inline editing on the LIVE site.
  *
- * Activates when the visitor is logged in as admin (admin_session cookie,
- * checked via GET /api/admin/me). When active:
+ * Activates when the visitor is logged in as admin (nodelx_admin_session
+ * cookie, checked via GET /api/admin/me). When active:
  *   1. Shows a fixed "Editing Mode" bar at the top of the page.
- *   2. Outlines every [data-nodelx-id] / [data-nodelx-field] element on hover.
+ *   2. Outlines every editable element on hover.
  *   3. Click a text element → contenteditable inline editing.
- *   4. Click an image element → file picker → uploads to NodeLx → swaps src.
- *   5. Edits are staged locally; the bar's "Publish" button sends the full
- *      content object to NodeLx (PUT /api/sites/:siteId/content/home), which
- *      commits content/home.json to GitHub and revalidates the live site.
+ *   4. Click an image element → file picker → uploads → swaps src.
+ *   5. Edits are staged locally; the bar's "Publish" button sends the staged
+ *      mutations to POST /api/admin/save, which applies them onto the current
+ *      content and PUTs the full content to NodeLx (GitHub commit + revalidate).
  *
- * Element identification (two compatible formats):
- *   Format A (explicit): data-nodelx-id="hero.heroImage" data-nodelx-type="image"
- *   Format B (composed): [data-nodelx-section="hero"] > [data-nodelx-field="badge"]
+ * Element identification (three compatible formats, in priority order):
+ *   Format A (primary):  data-editable="hero.badge"
+ *                        data-editable-type="image"  (for images)
+ *   Format B (legacy):   data-nodelx-id="hero.heroImage" data-nodelx-type="image"
+ *   Format C (legacy):   [data-nodelx-section="hero"] > [data-nodelx-field="badge"]
  *     The bridge derives id "hero.badge" at click time.
  */
 
 import { useEffect, useState, useCallback } from 'react'
-
-// ── Dot-notation helpers ────────────────────────────────────────────────────
-function getByPath(obj: any, path: string): any {
-  return path.split('.').reduce((acc, key) => (acc == null ? undefined : acc[key]), obj)
-}
-
-function setByPath(obj: any, path: string, value: any): any {
-  const keys = path.split('.')
-  const clone = JSON.parse(JSON.stringify(obj))
-  let cur = clone
-  for (let i = 0; i < keys.length - 1; i++) {
-    const k = keys[i]
-    if (cur[k] == null || typeof cur[k] !== 'object') cur[k] = {}
-    cur = cur[k]
-  }
-  cur[keys[keys.length - 1]] = value
-  return clone
-}
 
 export default function NodelxBridge() {
   const [isAdmin, setIsAdmin] = useState(false)
@@ -63,37 +47,49 @@ export default function NodelxBridge() {
     const style = document.createElement('style')
     style.id = 'nodelx-bridge-styles'
     style.textContent = `
-      [data-nodelx-id], [data-nodelx-field] {
+      [data-editable], [data-nodelx-id], [data-nodelx-field] {
         cursor: pointer !important;
         outline: 2px solid transparent;
         outline-offset: 3px;
         transition: outline-color 0.15s ease;
       }
-      [data-nodelx-id]:hover, [data-nodelx-field]:hover {
+      [data-editable]:hover, [data-nodelx-id]:hover, [data-nodelx-field]:hover {
         outline-color: #3b82f6 !important;
       }
-      [data-nodelx-id].nodelx-editing, [data-nodelx-field].nodelx-editing {
+      [data-editable].nodelx-editing, [data-nodelx-id].nodelx-editing, [data-nodelx-field].nodelx-editing {
         outline-color: #2563eb !important;
         outline-width: 2px;
         background: rgba(59,130,246,0.06);
       }
-      [data-nodelx-id].nodelx-staged, [data-nodelx-field].nodelx-staged {
+      [data-editable].nodelx-staged, [data-nodelx-id].nodelx-staged, [data-nodelx-field].nodelx-staged {
         outline-color: #4ade80 !important;
       }
     `
     document.head.appendChild(style)
 
     function resolveId(el: HTMLElement): string | null {
+      // Format A (primary): data-editable
+      const editable = el.getAttribute('data-editable')
+      if (editable) return editable
+      // Format B (legacy): data-nodelx-id
       const explicit = el.getAttribute('data-nodelx-id')
       if (explicit) return explicit
+      // Format C (legacy): data-nodelx-field inside data-nodelx-section
       const field = el.getAttribute('data-nodelx-field')
       const section = el.closest('[data-nodelx-section]')?.getAttribute('data-nodelx-section')
       if (field && section) return `${section}.${field}`
       return null
     }
 
+    function isImage(el: HTMLElement): boolean {
+      return (
+        el.getAttribute('data-editable-type') === 'image' ||
+        el.getAttribute('data-nodelx-type') === 'image'
+      )
+    }
+
     function readValue(el: HTMLElement): string {
-      if (el.getAttribute('data-nodelx-type') === 'image') {
+      if (isImage(el)) {
         return el.querySelector('img')?.getAttribute('src') ?? ''
       }
       return el.textContent?.trim() ?? ''
@@ -109,7 +105,8 @@ export default function NodelxBridge() {
     // ── Click handler: text → contenteditable, image → file picker ─────────
     function handleClick(e: MouseEvent) {
       const target = e.target as HTMLElement
-      const el = (target.closest('[data-nodelx-id]') ||
+      const el = (target.closest('[data-editable]') ||
+        target.closest('[data-nodelx-id]') ||
         target.closest('[data-nodelx-field]')) as HTMLElement | null
       if (!el) return
 
@@ -120,7 +117,7 @@ export default function NodelxBridge() {
       const id = resolveId(el)
       if (!id) return
 
-      if (el.getAttribute('data-nodelx-type') === 'image') {
+      if (isImage(el)) {
         // Image: open file picker → upload to NodeLx → swap src
         const input = document.createElement('input')
                 input.type = 'file'
@@ -192,28 +189,19 @@ export default function NodelxBridge() {
     }
   }, [isAdmin])
 
-  // ── Publish: apply staged edits + send full content to NodeLx ────────────
+  // ── Publish: send staged mutations to /api/admin/save ────────────────────
   const publish = useCallback(async () => {
     if (dirtyCount === 0 || saving) return
     setSaving(true)
     setStatus('Publishing…')
 
     try {
-      // Fetch current content from NodeLx (which reads it from GitHub)
-      const readRes = await fetch('/api/admin/content', { cache: 'no-store' })
-      const readData = await readRes.json()
-      let content = readData.content || {}
-
-      // Apply staged dot-notation edits
-      Object.keys(pending).forEach((id) => {
-        content = setByPath(content, id, pending[id])
-      })
-
-      // Send the full content to NodeLx to commit + revalidate
+      // Send the staged dot-notation mutations. The save route re-reads the
+      // current content, applies these, and PUTs the full content to NodeLx.
       const saveRes = await fetch('/api/admin/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ mutations: pending }),
       })
       const saveData = await saveRes.json()
 
@@ -324,12 +312,21 @@ export default function NodelxBridge() {
         >
           Dashboard
         </a>
-        <a
-          href="/api/admin/logout"
-          style={{ color: '#888', textDecoration: 'none', fontSize: '0.75rem' }}
-        >
-          Sign out
-        </a>
+        <form action="/api/admin/logout" method="POST" style={{ display: 'inline' }}>
+          <button
+            type="submit"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#888',
+              cursor: 'pointer',
+              fontSize: '0.75rem',
+              padding: 0,
+            }}
+          >
+            Sign out
+          </button>
+        </form>
       </div>
     </div>
   )
