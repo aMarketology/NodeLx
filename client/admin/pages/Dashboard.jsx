@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { api } from '../api';
 
-function SiteCard({ site, onDelete }) {
+function SiteCard({ site }) {
   const pageId = site.pageId || `${site.id}-home`;
   const initial = (site.name || '?').charAt(0).toUpperCase();
   const isLive = site.status === 'live' || site.liveUrl;
@@ -39,9 +39,13 @@ function SiteCard({ site, onDelete }) {
         >
           ↗
         </a>
-        <button className="site-action" title="Delete site" onClick={() => onDelete(site)}>
-          🗑
-        </button>
+        <Link
+          className="site-action"
+          to={`/admin/editor?page=${encodeURIComponent(pageId)}`}
+          title="Edit site"
+        >
+          ✏️
+        </Link>
       </div>
     </div>
   );
@@ -64,16 +68,6 @@ export default function Dashboard() {
   useEffect(() => {
     load();
   }, []);
-
-  const handleDelete = async (site) => {
-    if (!window.confirm(`Delete "${site.name}"? This cannot be undone.`)) return;
-    try {
-      await api.deleteSite(site.id);
-      load();
-    } catch (err) {
-      setError(err.message);
-    }
-  };
 
   return (
     <Layout
@@ -107,7 +101,7 @@ export default function Dashboard() {
       ) : (
         <div className="grid">
           {sites.map((site) => (
-            <SiteCard key={site.id} site={site} onDelete={handleDelete} />
+            <SiteCard key={site.id} site={site} />
           ))}
           <Link to="/admin/onboarding" className="add-card">
             <div className="add-icon">+</div>
