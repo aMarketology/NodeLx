@@ -7,6 +7,9 @@ function SiteCard({ site }) {
   const pageId = site.pageId || `${site.id}-home`;
   const initial = (site.name || '?').charAt(0).toUpperCase();
   const isLive = site.status === 'live' || site.liveUrl;
+  // The client site's own admin URL (e.g. https://www.diamondbctx.com/admin).
+  // NodeLkx serves as the onboarding/permissions hub; editing happens on the client site.
+  const editUrl = site.adminUrl || (site.liveUrl ? `${site.liveUrl.replace(/\/$/, '')}/admin` : null);
 
   return (
     <div className="site-card">
@@ -39,13 +42,21 @@ function SiteCard({ site }) {
         >
           ↗
         </a>
-        <Link
-          className="site-action"
-          to={`/admin/editor?page=${encodeURIComponent(pageId)}`}
-          title="Edit site"
-        >
-          ✏️
-        </Link>
+        {editUrl ? (
+          <a
+            className="site-action"
+            href={editUrl}
+            target="_blank"
+            rel="noreferrer"
+            title="Edit site"
+          >
+            ✏️
+          </a>
+        ) : (
+          <span className="site-action site-action-disabled" title="No admin URL configured">
+            ✏️
+          </span>
+        )}
       </div>
     </div>
   );

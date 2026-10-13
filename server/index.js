@@ -11,6 +11,7 @@ const WebSocketServer = require('./websocket');
 const adminRoutes   = require('./routes/admin');
 const sitesRoutes   = require('./routes/sites');
 const mediaRoutes   = require('./routes/media');
+const { ensureMediaBucket } = require('./mediaStore');
 const { getSiteByPageId } = require('./sites');
 const { getToken } = require('./siteTokens');
 const { callRevalidate } = require('./revalidate');
@@ -86,6 +87,19 @@ class NodeLxServer {
 
     // Initialize content store
     await this.contentStore.initialize();
+
+    // Ensure the Supabase "media" bucket exists (no-op if Supabase isn't configured/reachable).
+    // Never crash startup because of a storage outage — media endpoints will report the cause.
+    try {
+      const bucket = await ensureMediaBucket();
+      console.log(
+        bucket.ok
+          ? `[Media] Supabase bucket "${'media'}" ${bucket.created ? 'created' : 'ready'}`
+          : `[Media] Supabase bucket check failed: ${bucket.error}`,
+      );
+    } catch (err) {
+      console.warn('[Media] Supabase unavailable at startup:', err.message);
+    }
 
     // Subscribe to content changes and notify WebSocket clients
     this.contentStore.subscribe((event) => {

@@ -315,6 +315,10 @@ a {
   border-color: var(--accent);
   color: var(--accent);
 }
+.site-action-disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
 
 /* ── Add card ──────────────────────────────────────── */
 .add-card {

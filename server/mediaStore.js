@@ -16,6 +16,33 @@ const { getSupabaseClient } = require('./supabase');
 const BUCKET = 'media';
 
 /**
+ * Ensure the shared "media" bucket exists and is public.
+ * Called at startup so a fresh Supabase project needs no manual bucket setup.
+ * Fails softly: if Supabase isn't configured or is unreachable, this no-ops
+ * (media endpoints will still return a clear error until it's reachable).
+ *
+ * @returns {{ created: boolean, ok: boolean, error?: string }}
+ */
+async function ensureMediaBucket() {
+  const supabase = getSupabaseClient();
+  const { data: buckets, error: listErr } = await supabase.storage.listBuckets();
+  if (listErr) return { ok: false, error: listErr.message };
+
+  const exists = (buckets || []).some((b) => b.name === BUCKET);
+  if (exists) {
+    await supabase.storage.updateBucket(BUCKET, { public: true }).catch(() => {});
+    return { created: false, ok: true };
+  }
+
+  const { error: createErr } = await supabase.storage.createBucket(BUCKET, {
+    public: true,
+    fileSizeLimit: '50MB',
+  });
+  if (createErr) return { ok: false, error: createErr.message };
+  return { created: true, ok: true };
+}
+
+/**
  * List all image files under media/{siteId}/ recursively (one folder deep).
  * Returns an array of: { name, folder, path, url, size, contentType }
  *
@@ -117,4 +144,4 @@ async function deleteMedia(storagePath) {
   return { ok: true };
 }
 
-module.exports = { listSiteMedia, uploadMedia, deleteMedia };
+module.exports = { listSiteMedia, uploadMedia, deleteMedia, ensureMediaBucket };
