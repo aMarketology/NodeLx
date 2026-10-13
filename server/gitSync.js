@@ -151,6 +151,44 @@ class GitSync {
       commitUrl: data.commit?.html_url || null,
     };
   }
+
+  /**
+   * Create or update a single BINARY file (e.g. an image in public/), committing
+   * it to the target branch. Unlike commitFile (UTF-8 text), this base64-encodes
+   * the raw bytes so images/videos are not corrupted.
+   *
+   * @param {object} site site object (repo/owner/repoName/branch)
+   * @param {string} repoPath path inside the repo (e.g. "public/uploads/photo.jpg")
+   * @param {Buffer} buffer raw file bytes
+   * @param {string} message commit message
+   * @returns {Promise<{path, sha, commitUrl}>}
+   */
+  async commitBinaryFile(site, repoPath, buffer, message) {
+    const client = this.clientFor(site);
+    if (!client) {
+      throw new Error('No GitHub token configured for this site');
+    }
+
+    const { owner, repo, branch } = this.resolveTarget(site);
+    const path = repoPath.replace(/^\/+/, '');
+
+    const existingSha = await this.getFileSha(client, owner, repo, branch, path);
+    const { data } = await client.repos.createOrUpdateFileContents({
+      owner,
+      repo,
+      path,
+      message,
+      content: buffer.toString('base64'),
+      branch,
+      ...(existingSha ? { sha: existingSha } : {}),
+    });
+
+    return {
+      path,
+      sha: data.commit?.sha || null,
+      commitUrl: data.commit?.html_url || null,
+    };
+  }
 }
 
 module.exports = GitSync;

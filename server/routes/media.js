@@ -1,11 +1,14 @@
 /**
  * routes/media.js
  *
- * Supabase storage API — image listing and upload.
+ * Media upload API — auto-routes by size/type:
  *
- * GET    /api/media/:siteId   list all images for a site
- * POST   /api/media/upload    upload a new image (base64 JSON body)
- * DELETE /api/media           delete an image by storage path
+ *   GET    /api/media/:siteId   list all media for a site (Supabase bucket)
+ *   POST   /api/media/upload    upload (base64 JSON body)
+ *       • small images (≤ threshold) → committed to the client repo public/uploads/
+ *         via the PAT (GitHub Contents API) — instant, no external dependency.
+ *       • large images / videos      → Supabase per-client bucket (media-<siteId>).
+ *   DELETE /api/media           delete media by storage path
  *
  * Auth: shared NODELX_API_KEY (Bearer token), matching routes/sites.js.
  * The client site sends `Authorization: Bearer <NODELX_API_KEY>`.
@@ -13,13 +16,17 @@
 
 const express = require('express');
 const { listSiteMedia, uploadMedia, deleteMedia } = require('../mediaStore');
-
-const router = express.Router();
+const { getSiteById } = require('../sites');
 
 const ALLOWED_TYPES = new Set([
   'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml',
   'video/mp4', 'video/webm', 'video/quicktime',
 ]);
+
+const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml']);
+
+// Small images at or below this size are committed to the repo; larger go to Supabase.
+const GITHUB_THRESHOLD_BYTES = Number(process.env.MEDIA_GITHUB_THRESHOLD_BYTES || 1_048_576); // 1 MB
 
 // ─── API key guard (shared NODELX_API_KEY) ────────────────────────────────
 const requireApiKey = (req, res, next) => {
@@ -35,92 +42,117 @@ const requireApiKey = (req, res, next) => {
   next();
 };
 
-// ─── List images ───────────────────────────────────────────────────────────
+module.exports = function mediaRouter(gitSync) {
+  const router = express.Router();
 
-router.get('/api/media/:siteId', requireApiKey, async (req, res) => {
-  // Sanitize siteId — only alphanumeric + underscore/hyphen
-  const siteId = req.params.siteId.replace(/[^a-zA-Z0-9_-]/g, '');
-  if (!siteId) return res.status(400).json({ error: 'Invalid siteId.' });
+  // ─── List media ─────────────────────────────────────────────────────────
 
-  try {
-    const images = await listSiteMedia(siteId);
-    res.json({ ok: true, siteId, images });
-  } catch (err) {
-    console.error('[Media] List error:', err.message);
-    res.status(500).json({ error: 'Failed to list media.' });
-  }
-});
+  router.get('/api/media/:siteId', requireApiKey, async (req, res) => {
+    // Sanitize siteId — only alphanumeric + underscore/hyphen
+    const siteId = req.params.siteId.replace(/[^a-zA-Z0-9_-]/g, '');
+    if (!siteId) return res.status(400).json({ error: 'Invalid siteId.' });
 
-// ─── Upload image ──────────────────────────────────────────────────────────
+    try {
+      const images = await listSiteMedia(siteId);
+      res.json({ ok: true, siteId, images });
+    } catch (err) {
+      console.error('[Media] List error:', err.message);
+      res.status(500).json({ error: 'Failed to list media.' });
+    }
+  });
 
-router.post('/api/media/upload', requireApiKey, async (req, res) => {
-  const { siteId, folder, filename, contentType, data } = req.body || {};
+  // ─── Upload media ───────────────────────────────────────────────────────
 
-  if (!siteId || !folder || !filename || !contentType || !data) {
-    return res.status(400).json({ error: 'siteId, folder, filename, contentType, and data (base64) are required.' });
-  }
+  router.post('/api/media/upload', requireApiKey, async (req, res) => {
+    const { siteId, folder, filename, contentType, data } = req.body || {};
 
-  if (!ALLOWED_TYPES.has(contentType)) {
-    return res.status(400).json({ error: 'Unsupported file type. Allowed: jpeg, png, webp, gif, svg, mp4, webm, quicktime.' });
-  }
+    if (!siteId || !folder || !filename || !contentType || !data) {
+      return res.status(400).json({ error: 'siteId, folder, filename, contentType, and data (base64) are required.' });
+    }
 
-  // Sanitize all path segments — no traversal, no special chars
-  const safeSite   = siteId.replace(/[^a-zA-Z0-9_-]/g, '');
-  const safeFolder = folder.replace(/[^a-zA-Z0-9_\-. ]/g, '_');
-  const safeName   = filename.replace(/[^a-zA-Z0-9_\-. ]/g, '_');
+    if (!ALLOWED_TYPES.has(contentType)) {
+      return res.status(400).json({ error: 'Unsupported file type. Allowed: jpeg, png, webp, gif, svg, mp4, webm, quicktime.' });
+    }
 
-  if (!safeSite || !safeFolder || !safeName) {
-    return res.status(400).json({ error: 'Invalid path components.' });
-  }
+    // Sanitize all path segments — no traversal, no special chars
+    const safeSite   = siteId.replace(/[^a-zA-Z0-9_-]/g, '');
+    const safeFolder = folder.replace(/[^a-zA-Z0-9_\-. ]/g, '_');
+    const safeName   = filename.replace(/[^a-zA-Z0-9_\-. ]/g, '_');
 
-  let buffer;
-  try {
-    buffer = Buffer.from(data, 'base64');
-  } catch {
-    return res.status(400).json({ error: 'data must be a valid base64 string.' });
-  }
+    if (!safeSite || !safeFolder || !safeName) {
+      return res.status(400).json({ error: 'Invalid path components.' });
+    }
 
-  // Reject suspiciously small or large buffers
-  if (buffer.length < 100 || buffer.length > 52_428_800) {
-    return res.status(400).json({ error: 'File size must be between 100 bytes and 50 MB.' });
-  }
+    let buffer;
+    try {
+      buffer = Buffer.from(data, 'base64');
+    } catch {
+      return res.status(400).json({ error: 'data must be a valid base64 string.' });
+    }
 
-  try {
-    const result = await uploadMedia(safeSite, safeFolder, safeName, buffer, contentType);
-    res.json({ ok: true, ...result });
-  } catch (err) {
-    console.error('[Media] Upload error:', err.message);
-    res.status(500).json({ error: 'Upload failed.' });
-  }
-});
+    // Reject suspiciously small or large buffers
+    if (buffer.length < 100 || buffer.length > 52_428_800) {
+      return res.status(400).json({ error: 'File size must be between 100 bytes and 50 MB.' });
+    }
 
-// ─── Delete image ──────────────────────────────────────────────────────────
+    // ── Routing decision ──────────────────────────────────────────────────
+    // Small images → GitHub (repo public/uploads/). Large images / videos → Supabase.
+    const isSmallImage = IMAGE_TYPES.has(contentType) && buffer.length <= GITHUB_THRESHOLD_BYTES;
 
-router.delete('/api/media', requireApiKey, async (req, res) => {
-  const { siteId, path: storagePath } = req.body || {};
+    try {
+      if (isSmallImage) {
+        const site = getSiteById(safeSite);
+        if (!site) return res.status(404).json({ error: 'Unknown site.' });
+        if (!gitSync || !gitSync.isConfigured()) {
+          return res.status(503).json({ error: 'GitHub sync not configured for this site.' });
+        }
 
-  if (!siteId || typeof siteId !== 'string') {
-    return res.status(400).json({ error: 'siteId is required.' });
-  }
-  if (!storagePath || typeof storagePath !== 'string') {
-    return res.status(400).json({ error: 'path is required.' });
-  }
+        const remotePath = `public/${safeFolder}/${safeName}`;
+        const commit = await gitSync.commitBinaryFile(
+          site,
+          remotePath,
+          buffer,
+          `media: upload ${safeName}`,
+        );
+        return res.json({ ok: true, url: `/${safeFolder}/${safeName}`, path: remotePath, source: 'github', commitSha: commit.sha });
+      }
 
-  // Validate: no traversal, no leading slash
-  if (/\.\./.test(storagePath) || storagePath.startsWith('/')) {
-    return res.status(400).json({ error: 'Invalid path.' });
-  }
+      const result = await uploadMedia(safeSite, safeFolder, safeName, buffer, contentType);
+      res.json({ ok: true, ...result, source: 'supabase' });
+    } catch (err) {
+      console.error('[Media] Upload error:', err.message);
+      res.status(500).json({ error: 'Upload failed.' });
+    }
+  });
 
-  const safeSite = siteId.replace(/[^a-zA-Z0-9_-]/g, '');
-  if (!safeSite) return res.status(400).json({ error: 'Invalid siteId.' });
+  // ─── Delete media ───────────────────────────────────────────────────────
 
-  try {
-    await deleteMedia(safeSite, storagePath);
-    res.json({ ok: true });
-  } catch (err) {
-    console.error('[Media] Delete error:', err.message);
-    res.status(500).json({ error: 'Delete failed.' });
-  }
-});
+  router.delete('/api/media', requireApiKey, async (req, res) => {
+    const { siteId, path: storagePath } = req.body || {};
 
-module.exports = router;
+    if (!siteId || typeof siteId !== 'string') {
+      return res.status(400).json({ error: 'siteId is required.' });
+    }
+    if (!storagePath || typeof storagePath !== 'string') {
+      return res.status(400).json({ error: 'path is required.' });
+    }
+
+    // Validate: no traversal, no leading slash
+    if (/\.\./.test(storagePath) || storagePath.startsWith('/')) {
+      return res.status(400).json({ error: 'Invalid path.' });
+    }
+
+    const safeSite = siteId.replace(/[^a-zA-Z0-9_-]/g, '');
+    if (!safeSite) return res.status(400).json({ error: 'Invalid siteId.' });
+
+    try {
+      await deleteMedia(safeSite, storagePath);
+      res.json({ ok: true });
+    } catch (err) {
+      console.error('[Media] Delete error:', err.message);
+      res.status(500).json({ error: 'Delete failed.' });
+    }
+  });
+
+  return router;
+};

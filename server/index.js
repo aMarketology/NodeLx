@@ -63,8 +63,8 @@ class NodeLxServer {
     // Sites router (onboarding + Git-backed publishing bridge)
     this.app.use(sitesRoutes(this.gitSync));
 
-    // Media router (Supabase image storage)
-    this.app.use(mediaRoutes);
+    // Media router (Supabase image storage + GitHub small-image commits)
+    this.app.use(mediaRoutes(this.gitSync));
 
     // ─── 🔒 API security boundary ───────────────────────────────────────────
     // Public: content reads + health (needed by the live site). Everything else
