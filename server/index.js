@@ -12,7 +12,7 @@ const adminRoutes   = require('./routes/admin');
 const sitesRoutes   = require('./routes/sites');
 const mediaRoutes   = require('./routes/media');
 const { ensureMediaBucket } = require('./mediaStore');
-const { getSiteByPageId } = require('./sites');
+const { getSiteByPageId, getSites } = require('./sites');
 const { getToken } = require('./siteTokens');
 const { callRevalidate } = require('./revalidate');
 const { verifyToken, COOKIE_NAME } = require('./auth/jwt');
@@ -97,6 +97,22 @@ class NodeLxServer {
           ? `[Media] Supabase bucket "${'media'}" ${bucket.created ? 'created' : 'ready'}`
           : `[Media] Supabase bucket check failed: ${bucket.error}`,
       );
+    } catch (err) {
+      console.warn('[Media] Supabase unavailable at startup:', err.message);
+    }
+
+    // Ensure each registered client has its own Supabase media bucket (media-<siteId>).
+    // No-op if Supabase isn't configured/reachable — media endpoints will report the cause.
+    try {
+      for (const site of getSites()) {
+        if (!site.id) continue;
+        const bucket = await ensureMediaBucket(site.id);
+        console.log(
+          bucket.ok
+            ? `[Media] Bucket "media-${site.id}" ${bucket.created ? 'created' : 'ready'}`
+            : `[Media] Bucket check failed for ${site.id}: ${bucket.error}`,
+        );
+      }
     } catch (err) {
       console.warn('[Media] Supabase unavailable at startup:', err.message);
     }

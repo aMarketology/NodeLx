@@ -18,6 +18,7 @@ const router = express.Router();
 
 const ALLOWED_TYPES = new Set([
   'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml',
+  'video/mp4', 'video/webm', 'video/quicktime',
 ]);
 
 // ─── API key guard (shared NODELX_API_KEY) ────────────────────────────────
@@ -60,7 +61,7 @@ router.post('/api/media/upload', requireApiKey, async (req, res) => {
   }
 
   if (!ALLOWED_TYPES.has(contentType)) {
-    return res.status(400).json({ error: 'Unsupported file type. Allowed: jpeg, png, webp, gif, svg.' });
+    return res.status(400).json({ error: 'Unsupported file type. Allowed: jpeg, png, webp, gif, svg, mp4, webm, quicktime.' });
   }
 
   // Sanitize all path segments — no traversal, no special chars
@@ -96,8 +97,11 @@ router.post('/api/media/upload', requireApiKey, async (req, res) => {
 // ─── Delete image ──────────────────────────────────────────────────────────
 
 router.delete('/api/media', requireApiKey, async (req, res) => {
-  const { path: storagePath } = req.body || {};
+  const { siteId, path: storagePath } = req.body || {};
 
+  if (!siteId || typeof siteId !== 'string') {
+    return res.status(400).json({ error: 'siteId is required.' });
+  }
   if (!storagePath || typeof storagePath !== 'string') {
     return res.status(400).json({ error: 'path is required.' });
   }
@@ -107,8 +111,11 @@ router.delete('/api/media', requireApiKey, async (req, res) => {
     return res.status(400).json({ error: 'Invalid path.' });
   }
 
+  const safeSite = siteId.replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!safeSite) return res.status(400).json({ error: 'Invalid siteId.' });
+
   try {
-    await deleteMedia(storagePath);
+    await deleteMedia(safeSite, storagePath);
     res.json({ ok: true });
   } catch (err) {
     console.error('[Media] Delete error:', err.message);

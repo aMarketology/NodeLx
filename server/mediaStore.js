@@ -1,11 +1,12 @@
 /**
  * mediaStore.js
  *
- * All Supabase storage operations for the shared "media" bucket.
+ * All Supabase storage operations. Each client site gets its OWN isolated
+ * bucket, named media-<siteId> (e.g. media-williamb-construction).
  *
- * Folder layout in the bucket:
- *   media/{siteId}/{folder}/{filename}
- *   e.g. media/williamb-construction/uploads/front-exterior.jpg
+ * Folder layout inside a client's bucket:
+ *   {folder}/{filename}
+ *   e.g. uploads/front-exterior.jpg  or  videos/walkthrough.mp4
  *
  * Reads  → public CDN (no auth header needed)
  * Writes → service-role key (this server only)
@@ -13,73 +14,90 @@
 
 const { getSupabaseClient } = require('./supabase');
 
-const BUCKET = 'media';
+// Small images are committed to the client repo (via PAT); large images and
+// videos are stored here in Supabase. Allow both image and video types.
+const MIME_TYPES = [
+  'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml',
+  'video/mp4', 'video/webm', 'video/quicktime',
+];
 
 /**
- * Ensure the shared "media" bucket exists and is public.
- * Called at startup so a fresh Supabase project needs no manual bucket setup.
- * Fails softly: if Supabase isn't configured or is unreachable, this no-ops
- * (media endpoints will still return a clear error until it's reachable).
+ * Per-client bucket name. Sanitised siteId → media-<siteId>.
+ */
+const bucketName = (siteId) => `media-${siteId.replace(/[^a-zA-Z0-9_-]/g, '')}`;
+
+/**
+ * Ensure a client's bucket exists and is public.
+ * Called lazily on every media request (and at startup for registered sites)
+ * so a fresh Supabase project needs no manual bucket setup.
  *
+ * @param {string} siteId  e.g. "williamb-construction"
  * @returns {{ created: boolean, ok: boolean, error?: string }}
  */
-async function ensureMediaBucket() {
+async function ensureMediaBucket(siteId) {
   const supabase = getSupabaseClient();
+  const name = bucketName(siteId);
+
   const { data: buckets, error: listErr } = await supabase.storage.listBuckets();
   if (listErr) return { ok: false, error: listErr.message };
 
-  const exists = (buckets || []).some((b) => b.name === BUCKET);
+  const exists = (buckets || []).some((b) => b.name === name);
   if (exists) {
-    await supabase.storage.updateBucket(BUCKET, { public: true }).catch(() => {});
+    await supabase.storage.updateBucket(name, {
+      public: true,
+      allowedMimeTypes: MIME_TYPES,
+    }).catch(() => {});
     return { created: false, ok: true };
   }
 
-  const { error: createErr } = await supabase.storage.createBucket(BUCKET, {
+  const { error: createErr } = await supabase.storage.createBucket(name, {
     public: true,
     fileSizeLimit: '50MB',
+    allowedMimeTypes: MIME_TYPES,
   });
   if (createErr) return { ok: false, error: createErr.message };
   return { created: true, ok: true };
 }
 
 /**
- * List all image files under media/{siteId}/ recursively (one folder deep).
+ * List all media files in a client's bucket (one folder deep).
  * Returns an array of: { name, folder, path, url, size, contentType }
  *
  * @param {string} siteId  e.g. "williamb-construction"
  */
 async function listSiteMedia(siteId) {
   const supabase = getSupabaseClient();
+  const bucket = bucketName(siteId);
+  await ensureMediaBucket(siteId);
 
-  // List top-level items under siteId (could be files or sub-folders)
+  // List top-level items (could be files or sub-folders)
   const { data: topLevel, error: topErr } = await supabase.storage
-    .from(BUCKET)
-    .list(siteId, { limit: 100, sortBy: { column: 'name', order: 'asc' } });
+    .from(bucket)
+    .list('', { limit: 200, sortBy: { column: 'name', order: 'asc' } });
 
   if (topErr) throw new Error('[MediaStore] list failed: ' + topErr.message);
 
-  const images = [];
+  const media = [];
 
   for (const item of topLevel || []) {
     const isFile = Boolean(item.metadata);
 
     if (isFile) {
       // Root-level file (no sub-folder)
-      const storagePath = `${siteId}/${item.name}`;
-      const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
-      images.push({
+      const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(item.name);
+      media.push({
         name:        item.name,
         folder:      null,
-        path:        storagePath,
+        path:        item.name,
         url:         urlData.publicUrl,
-        size:        item.metadata.size,
-        contentType: item.metadata.mimetype,
+        size:        item.metadata?.size,
+        contentType: item.metadata?.mimetype,
       });
     } else {
       // Sub-folder — list its contents
-      const folderPath = `${siteId}/${item.name}`;
+      const folderPath = item.name;
       const { data: files, error: fErr } = await supabase.storage
-        .from(BUCKET)
+        .from(bucket)
         .list(folderPath, { limit: 200, sortBy: { column: 'name', order: 'asc' } });
 
       if (fErr) {
@@ -91,8 +109,8 @@ async function listSiteMedia(siteId) {
         if (!file.metadata) continue; // skip nested sub-folders
 
         const storagePath = `${folderPath}/${file.name}`;
-        const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
-        images.push({
+        const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(storagePath);
+        media.push({
           name:        file.name,
           folder:      item.name,
           path:        storagePath,
@@ -104,44 +122,51 @@ async function listSiteMedia(siteId) {
     }
   }
 
-  return images;
+  return media;
 }
 
 /**
- * Upload an image to Supabase storage.
+ * Upload media to the client's Supabase bucket.
  * Overwrites if a file at the same path already exists.
  *
  * @param {string} siteId      e.g. "williamb-construction"
- * @param {string} folder      e.g. "uploads"
+ * @param {string} folder      e.g. "uploads" | "videos"
  * @param {string} filename    e.g. "new-photo.jpg"
- * @param {Buffer} buffer      raw image bytes
- * @param {string} contentType e.g. "image/jpeg"
+ * @param {Buffer} buffer      raw bytes
+ * @param {string} contentType e.g. "image/jpeg" | "video/mp4"
  * @returns {{ path: string, url: string }}
  */
 async function uploadMedia(siteId, folder, filename, buffer, contentType) {
   const supabase    = getSupabaseClient();
-  const storagePath = `${siteId}/${folder}/${filename}`;
+  const bucket      = bucketName(siteId);
+  await ensureMediaBucket(siteId);
+
+  const storagePath = folder ? `${folder}/${filename}` : filename;
 
   const { error } = await supabase.storage
-    .from(BUCKET)
+    .from(bucket)
     .upload(storagePath, buffer, { contentType, upsert: true });
 
   if (error) throw new Error('[MediaStore] upload failed: ' + error.message);
 
-  const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
+  const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(storagePath);
   return { path: storagePath, url: urlData.publicUrl };
 }
 
 /**
- * Delete an image from Supabase storage.
+ * Delete media from the client's Supabase bucket.
  *
- * @param {string} storagePath  Full path within the bucket, e.g. "williamb-construction/uploads/file.jpg"
+ * @param {string} siteId       e.g. "williamb-construction"
+ * @param {string} storagePath  path within the bucket, e.g. "uploads/file.jpg"
  */
-async function deleteMedia(storagePath) {
+async function deleteMedia(siteId, storagePath) {
   const supabase = getSupabaseClient();
-  const { error } = await supabase.storage.from(BUCKET).remove([storagePath]);
+  const bucket   = bucketName(siteId);
+  await ensureMediaBucket(siteId);
+
+  const { error } = await supabase.storage.from(bucket).remove([storagePath]);
   if (error) throw new Error('[MediaStore] delete failed: ' + error.message);
   return { ok: true };
 }
 
-module.exports = { listSiteMedia, uploadMedia, deleteMedia, ensureMediaBucket };
+module.exports = { bucketName, listSiteMedia, uploadMedia, deleteMedia, ensureMediaBucket };
