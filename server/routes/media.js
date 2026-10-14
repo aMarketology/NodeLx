@@ -28,6 +28,24 @@ const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif
 // Small images at or below this size are committed to the repo; larger go to Supabase.
 const GITHUB_THRESHOLD_BYTES = Number(process.env.MEDIA_GITHUB_THRESHOLD_BYTES || 1_048_576); // 1 MB
 
+// Normalize a single path segment: strip extension, replace runs of
+// whitespace with a hyphen, drop any character that isn't alphanumeric,
+// hyphen, or dot, and re-attach a safe lowercase extension. Guarantees a
+// space-free, URL-safe filename.
+function sanitizeSegment(name) {
+  const raw = String(name || '').trim()
+  const m = /^(.*?)(\.[A-Za-z0-9]{1,5})$/.exec(raw)   // split off a real extension
+  const ext = m ? m[2].toLowerCase() : ''
+  const base = m ? m[1] : raw
+  const cleanedBase = base
+    .replace(/\s+/g, '-')              // spaces → hyphen
+    .replace(/[^a-zA-Z0-9._-]+/g, '-') // anything else → hyphen
+    .replace(/-{2,}/g, '-')            // collapse repeats
+    .replace(/^[-.]+|[-.]+$/g, '')     // trim leading/trailing
+  if (!cleanedBase) return ''
+  return `${cleanedBase}${ext}`
+}
+
 // ─── API key guard (shared NODELX_API_KEY) ────────────────────────────────
 const requireApiKey = (req, res, next) => {
   const configured = process.env.NODELX_API_KEY;
@@ -40,6 +58,18 @@ const requireApiKey = (req, res, next) => {
     return res.status(401).json({ error: 'Invalid API key' });
   }
   next();
+};
+
+// Sanitize folder/filename — no traversal, no spaces, no special chars.
+// Spaces in filenames make URLs fragile (require %20 encoding) and break
+// across browsers/CDNs, so we normalize them to hyphens.
+const sanitizePathSegment = (str) => {
+  if (typeof str !== 'string') return '';
+  return str
+    .replace(/[^a-zA-Z0-9_\-. ]/g, '_') // Keep alphanumerics, _, ., - and space
+    .replace(/ +/g, '-')                // Convert spaces to hyphens
+    .replace(/--+/g, '-')               // Collapse multiple hyphens
+    .replace(/^-+|-+$/g, '');           // Trim leading/trailing hyphens
 };
 
 module.exports = function mediaRouter(gitSync) {
@@ -74,10 +104,12 @@ module.exports = function mediaRouter(gitSync) {
       return res.status(400).json({ error: 'Unsupported file type. Allowed: jpeg, png, webp, gif, svg, mp4, webm, quicktime.' });
     }
 
-    // Sanitize all path segments — no traversal, no special chars
+    // Sanitize all path segments — no traversal, no spaces, no special chars.
+    // Spaces in filenames make URLs fragile (require %20 encoding) and break
+    // across browsers/CDNs, so we normalize them to hyphens.
     const safeSite   = siteId.replace(/[^a-zA-Z0-9_-]/g, '');
-    const safeFolder = folder.replace(/[^a-zA-Z0-9_\-. ]/g, '_');
-    const safeName   = filename.replace(/[^a-zA-Z0-9_\-. ]/g, '_');
+    const safeFolder = sanitizeSegment(folder);
+    const safeName   = sanitizeSegment(filename);
 
     if (!safeSite || !safeFolder || !safeName) {
       return res.status(400).json({ error: 'Invalid path components.' });
