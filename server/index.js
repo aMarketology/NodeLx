@@ -183,8 +183,22 @@ class NodeLxServer {
             const xfo = r.headers.get('x-frame-options') || '';
             const frameAncestors = /frame-ancestors\s+([^;]+)/i.exec(csp)?.[1]?.trim() || '';
             const allowed = frameAncestors.split(/\s+/).filter(Boolean);
-            const allowsSelf = allowed.includes("'self'");
-            const allowsNodelx = allowed.some((o) => nodelxOrigin.includes(o.replace(/^https?:\/\//, '')) || o.includes(nodelxOrigin.replace(/^https?:\/\//, '')));
+
+            // If there is no frame-ancestors directive AND no X-Frame-Options,
+            // the site is NOT blocked — it can be iframed by default.
+            const hasFrameRestriction = frameAncestors.length > 0 || xfo.length > 0;
+
+            let verdict;
+            if (!hasFrameRestriction) {
+              verdict = 'OK — no frame-ancestors / X-Frame-Options restriction (iframe allowed)';
+            } else {
+              const allowsSelf = allowed.includes("'self'");
+              const allowsNodelx = allowed.some((o) => nodelxOrigin.includes(o.replace(/^https?:\/\//, '')) || o.includes(nodelxOrigin.replace(/^https?:\/\//, '')));
+              const xfoAllows = /allow-from/i.test(xfo) || /sameorigin/i.test(xfo) === false;
+              verdict = allowsNodelx
+                ? 'OK — NodeLx origin is allowed'
+                : `BLOCKED — frame-ancestors does not include NodeLx origin (${nodelxOrigin}). Set NODELX_URL on the client's Vercel deployment and redeploy.`;
+            }
 
             res.json({
               ok: true,
@@ -194,9 +208,7 @@ class NodeLxServer {
               csp,
               xFrameOptions: xfo,
               frameAncestors: allowed,
-              verdict: allowsNodelx
-                ? 'OK — NodeLx origin is allowed'
-                : `BLOCKED — frame-ancestors does not include NodeLx origin (${nodelxOrigin}). Set NODELX_URL on the client's Vercel deployment and redeploy.`,
+              verdict,
             });
           } catch (err) {
             res.json({ ok: false, error: err.message });

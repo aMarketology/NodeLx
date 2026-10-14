@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import Brand from '../components/Brand';
+import DebugPanel from '../components/DebugPanel';
 import { useAuth } from '../AuthContext';
 import { api } from '../api';
+import { logMessage, logInfo } from '../debugLog';
 
 /**
  * NodeLx Editor — sidebar model, aligned to the client's NodelxBridge protocol.
@@ -59,6 +61,7 @@ export default function Editor() {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState({ msg: '', kind: '' });
     const [diagnosis, setDiagnosis] = useState(null); // CSP verdict
+    const [debugOpen, setDebugOpen] = useState(true); // debug traffic panel
 
     const dirtyCount = Object.keys(pending).length;
     const activeUrl = mode === 'live' ? liveUrl : localUrl;
@@ -100,8 +103,16 @@ export default function Editor() {
         try {
           const d = await api.diagnoseEditor(pageId);
           setDiagnosis(d);
+          if (d.ok && d.verdict) {
+            logInfo({
+              level: d.verdict.startsWith('BLOCKED') ? 'error' : 'info',
+              title: 'CSP frame-ancestors',
+              detail: `${d.verdict}\nCSP: ${d.csp || '(none)'}\nX-Frame-Options: ${d.xFrameOptions || '(none)'}`,
+            });
+          }
         } catch (err) {
           setDiagnosis({ ok: false, error: err.message });
+          logInfo({ level: 'error', title: 'CSP diagnose failed', detail: err.message });
         }
       })();
     }, [site, pageId]);
@@ -109,8 +120,9 @@ export default function Editor() {
   const postToFrame = useCallback((msg) => {
     try {
       frameRef.current?.contentWindow?.postMessage(msg, '*');
-    } catch {
-      /* cross-origin — ignore */
+      logMessage({ direction: 'out', type: msg.type, payload: msg.payload });
+    } catch (err) {
+      logInfo({ level: 'error', title: 'postMessage failed', detail: err.message });
     }
   }, []);
 
@@ -119,6 +131,8 @@ export default function Editor() {
     const onMessage = (e) => {
       const data = e.data;
       if (!data || typeof data !== 'object') return;
+
+      logMessage({ direction: 'in', type: data.type, payload: data });
 
       if (data.type === 'NODELX_READY') {
         setLoading(false);
@@ -277,6 +291,13 @@ export default function Editor() {
           <button className="btn btn-discard" onClick={discard} disabled={dirtyCount === 0 || saving}>
             Discard
           </button>
+          <button
+            className={`btn btn-ghost debug-toggle-btn ${debugOpen ? 'active' : ''}`}
+            onClick={() => setDebugOpen(!debugOpen)}
+            title="Toggle debug traffic panel"
+          >
+            🐞 Debug
+          </button>
           <div className="user-chip">
             <span className="user-avatar">{(user?.email || '?').charAt(0).toUpperCase()}</span>
             <span>{user?.email || '…'}</span>
@@ -325,6 +346,8 @@ export default function Editor() {
               <p className="hint">Editable elements are outlined in blue.</p>
             </div>
           )}
+
+          {debugOpen && <DebugPanel />}
         </div>
 
         {/* Iframe */}

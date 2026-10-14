@@ -1,52 +1,60 @@
 # NodeLx
 
-A developer-first CMS with live preview and content editing capabilities. Think VS Code meets headless CMS with inline editing for clients.
+A **headless content backend** for client websites. Think of it as a Git-backed CMS: developers connect a client's GitHub repo, and clients edit their content (text, images, blog posts) inline on their own live site — every save becomes a GitHub commit that goes live in seconds.
 
-## 🌐 Network-Enabled Editing
-
-NodeLx now supports **distributed editing** over your local network! Edit from any device while your source code stays on your development machine.
+## How it works
 
 ```
-Desktop/Tablet  ──HTTP/WS──►  Laptop (Server + Files)
+Client site (Next.js)                     NodeLx (Express backend)
+├── NodelxBridge / AdminBar  ──POST /api/admin/save──►  commits content/*.json
+│   (inline text + image editing)                          to the client's GitHub repo
+│                                                          + POSTs /api/revalidate
+└── Admin dashboard (/admin)  ◄──reads content──  ───────►  returns fresh content
+    (homepage, media, blog)
 ```
 
-[📖 See Network Setup Guide](NETWORK_SETUP.md) for configuration instructions.
+- **Content lives in `content/*.json`** in each client's own GitHub repo (not in a database).
+- **NodeLx is stateless** — it has no database; it just commits files and revalidates.
+- **The editing UI lives on the client site**, not in NodeLx.
+- **Media** small images commit to the repo; large images/videos go to Supabase.
 
 ## Architecture
 
-### For Developers
-- Real-time code editor with live preview
-- Cursor-to-DOM element highlighting
-- Full control over templates, components, and structure
-- React/JSX component system
-
 ### For Clients
-- Locked-down editing interface
-- Only modify content (text, images, links)
-- No code exposure
-- Changes save to content layer, not codebase
+- Locked-down editing on their own site (inline text, image swap)
+- A dedicated admin dashboard for structured content (homepage, media, blog)
+- No code exposure — changes save to `content/*.json`, not code
+
+### For Developers / Super Admins
+- A dashboard to onboard new client sites (GitHub repo + PAT)
+- A debug traffic panel to inspect every request/response between NodeLx and a client site
+- An iframe editor (`/admin/editor`) with a postMessage preview bridge
 
 ## Project Structure
 
 ```
 NodeLx/
-├── server/                 # Node.js backend
-│   ├── index.js           # Main Express server
-│   ├── contentStore.js    # In-memory content management
-│   ├── sourceMap.js       # JSX-to-DOM mapping
-│   └── websocket.js       # WebSocket for live updates
-├── client/                # React frontend
-│   ├── App.jsx            # Main app with live preview
-│   ├── main.jsx           # Entry point
-│   ├── components/        # React components (templates)
-│   │   └── HomePage.jsx   # Sample component with editable regions
-│   ├── editor/            # Developer editor (TODO)
-│   └── preview/           # Preview interface (TODO)
-├── content/               # JSON content files (dev mode)
-│   └── sample-page.json   # Sample content
-├── publish/               # Supabase publishing (TODO)
-└── public/                # Static assets
+├── server/                 # Node.js (Express) backend
+│   ├── index.js           # Main Express server + routes
+│   ├── gitSync.js         # GitHub Contents API (commit/read content files)
+│   ├── mediaStore.js      # Supabase media uploads
+│   ├── revalidate.js      # ISR revalidation calls to client sites
+│   ├── siteTokens.js      # Per-site GitHub PAT store (gitignored)
+│   ├── sites.js           # Site registry (content/sites.json)
+│   ├── auth/              # JWT auth (developer/client roles)
+│   └── routes/            # admin, sites, media routers
+├── client/admin/          # React admin SPA (Vite)
+│   ├── api.js             # API client (debug-instrumented)
+│   ├── debugLog.js        # Traffic log for the Debug panel
+│   ├── pages/             # Dashboard, Onboarding, Editor, Login
+│   └── components/        # Layout, Brand, DebugPanel
+├── content/               # sites.json (registry) + .site-tokens.json (gitignored)
+└── public/                # Static assets + edit-mode scripts
 ```
+
+> **Note:** the cloning/source-mapping/WebSocket features described in older
+> sections of this README are **legacy** — NodeLx now uses a headless
+> Git-backed model. See "Roadmap" below for current status.
 
 ## Key Concepts
 
@@ -187,17 +195,41 @@ function AboutPage({ content }) {
 
 ## Roadmap
 
-- [x] In-memory content store with file watching
-- [x] Source mapping system for JSX
-- [x] WebSocket live updates
-- [x] Basic React preview
-- [ ] Developer editor with syntax highlighting
-- [ ] Client editing interface overlay
-- [ ] Supabase integration for publishing
-- [ ] Authentication and permissions
-- [ ] Multi-page support
-- [ ] Asset management
-- [ ] Version history
+**NodeLx is now a headless content backend** — it no longer uses the WebSocket/source-mapping model described above. It commits `content/*.json` to each client's GitHub repo and revalidates the live site on every save. The editing UX lives on the client site itself (Inline Editor + Admin Dashboard).
+
+### The three editing capabilities
+
+Each capability is independently permissioned per client:
+
+| Capability | Status | Where it runs |
+|---|---|---|
+| **Text editing** | ✅ Done | Client site inline editor (`NodelxBridge`) |
+| **Image swapping** | ✅ Done | Client site inline editor (`ImageSwapModal`) |
+| **Blog writing** | ✅ Done (williamb) | Client admin dashboard (`/admin/blog`) |
+
+### Core (done)
+
+- [x] Headless Git-backed publishing (commit `content/*.json` → client GitHub repo)
+- [x] ISR revalidation (call `/api/revalidate` on the client after each commit)
+- [x] Media upload (small images → GitHub, large/video → Supabase)
+- [x] Multi-site registry (`content/sites.json`)
+- [x] Per-site GitHub PAT store (`content/.site-tokens.json`)
+- [x] Bridge API (`NODELX_API_KEY`) for the client's own admin panel
+- [x] Client-side inline editor (`NodelxBridge` + `AdminBar`) — text + images
+- [x] Admin dashboard (`/admin`) with homepage + media + blog editors
+- [x] Debug traffic panel (NodeLx editor, super-admin only)
+- [x] postMessage preview bridge (`nodelx-preview.js`) for iframe editing
+
+### In progress / next
+
+- [ ] Per-capability permission flags (text / image / blog toggle per client)
+- [ ] Blog editor: full body blocks (numberedItems, FAQ, CTA) — currently metadata + intro only
+- [ ] Version history (audit trail of commits per content file)
+
+### Not started
+
+- [ ] Supabase row-level auth (optional future)
+- [ ] Developer code editor with syntax highlighting (deprioritized — editing is content-only)
 
 ## Production Deployment
 

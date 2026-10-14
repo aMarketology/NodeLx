@@ -767,3 +767,129 @@ a {
   font-size: 0.8rem;
   cursor: pointer;
 }
+
+/* ── Debug traffic panel ─────────────────────────────── */
+.debug-toggle-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.debug-panel {
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+.debug-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.debug-panel-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.debug-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.debug-filter {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.7rem;
+  padding: 0.2rem 0.4rem;
+  outline: none;
+}
+.debug-toggle,
+.debug-clear {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+}
+.debug-toggle.active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.debug-panel-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.25rem 0;
+}
+.debug-empty {
+  padding: 1rem;
+  text-align: center;
+  color: var(--dim);
+  font-size: 0.75rem;
+}
+.debug-row {
+  border-bottom: 1px solid var(--border);
+}
+.debug-row-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0.35rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.72rem;
+  color: var(--text);
+}
+.debug-row-head:hover {
+  background: var(--bg);
+}
+.debug-row-time {
+  color: var(--dim);
+  font-family: ui-monospace, monospace;
+  flex-shrink: 0;
+}
+.debug-row-kind {
+  font-weight: 700;
+  font-size: 0.65rem;
+  flex-shrink: 0;
+  width: 2.2rem;
+}
+.debug-row-summary {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, monospace;
+}
+.debug-row-caret {
+  color: var(--dim);
+  flex-shrink: 0;
+}
+.debug-row-body {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg);
+  font-size: 0.7rem;
+  font-family: ui-monospace, monospace;
+  color: var(--muted);
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.debug-row-error .debug-row-summary {
+  color: var(--red);
+}
+.debug-row-warn .debug-row-summary {
+  color: var(--gold);
+}

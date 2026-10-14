@@ -5,12 +5,33 @@
  */
  const BASE = ''; // same-origin; Vite dev proxies /api to :9000
 
+import { logRequest, logResponse } from './debugLog';
+
 async function request(path, options = {}) {
-  const res = await fetch(BASE + path, {
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-    ...options,
-  });
+  const method = (options.method || 'GET').toUpperCase();
+  const url = BASE + path;
+  const started = Date.now();
+
+  let body;
+  try {
+    body = options.body ? JSON.parse(options.body) : undefined;
+  } catch {
+    body = options.body;
+  }
+
+  logRequest({ method, url, body });
+
+  let res;
+  try {
+    res = await fetch(BASE + path, {
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+      ...options,
+    });
+  } catch (err) {
+    logResponse({ method, url, status: 0, error: err.message, durationMs: Date.now() - started });
+    throw err;
+  }
 
   let data = null;
   try {
@@ -18,6 +39,14 @@ async function request(path, options = {}) {
   } catch {
     data = null;
   }
+
+  logResponse({
+    method,
+    url,
+    status: res.status,
+    body: data,
+    durationMs: Date.now() - started,
+  });
 
   if (!res.ok) {
     const err = new Error((data && data.error) || `Request failed (${res.status})`);
