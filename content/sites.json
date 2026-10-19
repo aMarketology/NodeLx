@@ -20,5 +20,16 @@
     "thumbnail": "",
     "status": "live",
     "lastEdited": "2026-10-13T00:00:00.000Z"
+  },
+  {
+    "id": "austin-web-services",
+    "name": "Austin Web Services",
+    "subtitle": "Web Design & SEO — Austin, TX",
+    "repo": "aMarketology/Austin-Web-Services",
+    "liveUrl": "https://austin-web-services.com",
+    "adminUrl": "https://austin-web-services.com/admin/blog-editor",
+    "thumbnail": "",
+    "status": "live",
+    "lastEdited": "2026-10-14T00:00:00.000Z"
   }
 ]
