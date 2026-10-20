@@ -25,13 +25,17 @@ class GitSync {
 
   /**
    * Resolve the effective token for a site: per-site token wins, else env.
-     * @param {object} site { id, repo, owner?, repoName?, branch?, _pat? }
+   * @param {object} site { id, repo, owner?, repoName?, branch?, _pat?, patEnvVar? }
    * @returns {string}
    */
   resolveToken(site = {}) {
       if (site._pat) return site._pat; // one-off token from onboarding verify
       const siteToken = site.id ? getToken(site.id) : null;
-      return siteToken || this.token;
+      if (siteToken) return siteToken;
+      // Durable per-site token via env var (survives ephemeral hosts like Railway).
+      // e.g. site.patEnvVar = "MODERN_PAT" → reads process.env.MODERN_PAT.
+      if (site.patEnvVar && process.env[site.patEnvVar]) return process.env[site.patEnvVar];
+      return this.token;
     }
 
   /**

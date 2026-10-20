@@ -19,6 +19,7 @@
     "adminUrl": "https://modernparking.co/admin",
     "thumbnail": "",
     "status": "live",
+    "patEnvVar": "MODERN_PAT",
     "lastEdited": "2026-10-13T00:00:00.000Z"
   },
   {
