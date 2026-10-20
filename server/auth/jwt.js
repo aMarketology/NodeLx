@@ -48,9 +48,16 @@ const setAuthCookie = (res, payload) => {
 };
 
 /**
- * Clear the auth cookie
+ * Clear the auth cookie.
+ * Must mirror the options used in setAuthCookie (path '/', sameSite, secure)
+ * or the cookie survives the clear. We clear with both secure and non-secure
+ * variants so it works over HTTP and HTTPS.
  * @param {import('express').Response} res
  */
-const clearAuthCookie = (res) => res.clearCookie(COOKIE_NAME);
+const clearAuthCookie = (res) => {
+  const opts = { httpOnly: true, sameSite: 'lax', path: '/' };
+  res.clearCookie(COOKIE_NAME, { ...opts, secure: true });
+  res.clearCookie(COOKIE_NAME, { ...opts, secure: false });
+};
 
 module.exports = { signToken, verifyToken, setAuthCookie, clearAuthCookie, COOKIE_NAME };
