@@ -26,6 +26,8 @@ async function callRevalidate(liveUrl, paths = ['/']) {
           ...(secret ? { 'x-revalidation-secret': secret } : {}),
         },
         body: JSON.stringify({ paths: [p] }),
+        // Never let a dead/misconfigured liveUrl hang a save — bail after 8s.
+        signal: AbortSignal.timeout(8000),
       });
       results.push({ path: p, status: r.status });
     } catch (err) {
