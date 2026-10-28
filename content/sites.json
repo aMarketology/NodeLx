@@ -8,6 +8,7 @@
     "adminUrl": "https://www.diamondbctx.com/admin",
     "thumbnail": "",
     "status": "live",
+    "patEnvVar": "WILLIAMB_PAT",
     "lastEdited": "2026-10-06T04:37:12.712Z"
   },
   {
