@@ -9,6 +9,12 @@
     "thumbnail": "",
     "status": "live",
     "patEnvVar": "WILLIAMB_PAT",
+    "capabilities": {
+      "theme": true,
+      "menu": true,
+      "blog": true,
+      "imageEditing": true
+    },
     "lastEdited": "2026-10-06T04:37:12.712Z"
   },
   {
@@ -21,6 +27,12 @@
     "thumbnail": "",
     "status": "live",
     "patEnvVar": "MODERN_PAT",
+    "capabilities": {
+      "theme": false,
+      "menu": false,
+      "blog": true,
+      "imageEditing": true
+    },
     "lastEdited": "2026-10-13T00:00:00.000Z"
   },
   {
@@ -33,5 +45,18 @@
     "thumbnail": "",
     "status": "live",
     "lastEdited": "2026-10-14T00:00:00.000Z"
+  },
+  {
+    "id": "spindler-construction",
+    "name": "Spindler Construction",
+    "subtitle": "Remodeling and construction - Austin, TX",
+    "repo": "ironoak-texas/spindler-constructionv3",
+    "branch": "main",
+    "adminUrl": "/admin/home",
+    "status": "draft",
+    "patEnvVar": "SPINDLER_PAT",
+    "capabilities": {
+      "imageEditing": true
+    }
   }
 ]
