@@ -3,13 +3,35 @@ import { Link, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { api } from '../api';
 
-function SiteCard({ site }) {
+const CAPABILITY_LABELS = {
+  text: 'Text editing',
+  imageEditing: 'Image swapping',
+  blog: 'Blog editor',
+  theme: 'Theme editor (fonts + colors)',
+  menu: 'Menu / navigation editor',
+};
+
+function SiteCard({ site, onUpdate }) {
   const pageId = site.pageId || `${site.id}-home`;
   const initial = (site.name || '?').charAt(0).toUpperCase();
   const isLive = site.status === 'live' || site.liveUrl;
-  // The client site's own admin URL (e.g. https://www.diamondbctx.com/admin).
-  // NodeLkx serves as the onboarding/permissions hub; editing happens on the client site.
   const editUrl = site.adminUrl || (site.liveUrl ? `${site.liveUrl.replace(/\/$/, '')}/admin` : null);
+
+  const caps = site.capabilities ?? {};
+  const [saving, setSaving] = useState(false);
+
+  async function toggleCap(key) {
+    const next = { ...caps, [key]: !(caps[key] !== false) };
+    setSaving(true);
+    try {
+      await api.updateSite(site.id, { capabilities: next });
+      onUpdate();
+    } catch (err) {
+      console.error('Failed to update capabilities:', err);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="site-card">
@@ -32,6 +54,22 @@ function SiteCard({ site }) {
           </div>
         </div>
       </Link>
+
+      {/* Capability toggles */}
+      <div className="site-caps">
+        {Object.entries(CAPABILITY_LABELS).map(([key, label]) => (
+          <label key={key} className="cap-toggle">
+            <input
+              type="checkbox"
+              checked={caps[key] !== false}
+              disabled={saving}
+              onChange={() => toggleCap(key)}
+            />
+            <span>{label}</span>
+          </label>
+        ))}
+      </div>
+
       <div className="site-actions">
         <a
           className="site-action"
@@ -83,9 +121,10 @@ export default function Dashboard() {
   return (
     <Layout
       actions={
-        <Link to="/admin/onboarding" className="btn btn-primary">
-          + Add Website
-        </Link>
+        <>
+          <Link to="/admin/email" className="btn btn-ghost">Email campaigns</Link>
+          <Link to="/admin/onboarding" className="btn btn-primary">+ Add Website</Link>
+        </>
       }
     >
       <div className="page-header">
@@ -112,7 +151,7 @@ export default function Dashboard() {
       ) : (
         <div className="grid">
           {sites.map((site) => (
-            <SiteCard key={site.id} site={site} />
+            <SiteCard key={site.id} site={site} onUpdate={load} />
           ))}
           <Link to="/admin/onboarding" className="add-card">
             <div className="add-icon">+</div>

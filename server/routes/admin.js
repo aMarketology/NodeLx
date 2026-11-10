@@ -70,6 +70,11 @@ router.get('/admin/onboarding', requireAuth, requireRole('developer'), (req, res
   serveAdminSpa(req, res);
 });
 
+// GET /admin/email → developer email campaign workspace
+router.get('/admin/email', requireAuth, requireRole('developer'), (req, res) => {
+  serveAdminSpa(req, res);
+});
+
 // GET /admin/editor → Client Mode editor (client or developer)
 router.get('/admin/editor', requireAuth, (req, res) => {
   serveAdminSpa(req, res);

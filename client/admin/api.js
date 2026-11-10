@@ -87,7 +87,7 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify(payload),
       }),
-
+    listEmailCampaigns: (siteId) => request(`/api/editor/sites/${encodeURIComponent(siteId)}/email/campaigns`),
     // ── Editor bridge (cookie auth) — read/write the client's GitHub content ──
     // Diagnose the client site's CSP (frame-ancestors) to see if NodeLx can iframe it.
     diagnoseEditor: (pageId) => request(`/api/editor/diagnose?page=${encodeURIComponent(pageId)}`),

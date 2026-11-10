@@ -106,14 +106,15 @@ module.exports = function sitesRouter(gitSync) {
     res.json({ site });
   });
 
-    // PATCH /api/sites/:id → update site fields (e.g. liveUrl)
+    // PATCH /api/sites/:id → update site fields (e.g. liveUrl, capabilities)
     router.patch('/api/sites/:id', requireAuth, requireRole('developer'), (req, res) => {
-      const { liveUrl, name, subtitle, branch } = req.body || {};
+      const { liveUrl, name, subtitle, branch, capabilities } = req.body || {};
       const fields = {};
       if (liveUrl !== undefined) fields.liveUrl = liveUrl;
       if (name !== undefined) fields.name = name;
       if (subtitle !== undefined) fields.subtitle = subtitle;
       if (branch !== undefined) fields.branch = branch;
+      if (capabilities !== undefined) fields.capabilities = capabilities;
 
       const site = updateSite(req.params.id, fields);
       if (!site) return res.status(404).json({ error: 'Site not found' });
@@ -231,6 +232,25 @@ module.exports = function sitesRouter(gitSync) {
       res.status(500).json({ error: err.message });
     }
   });
+
+  // GET /api/sites/:id/capabilities → per-site feature flags (client bridge).
+    // The client's /api/admin/session calls this to learn which editing
+    // capabilities are enabled for this site (theme, menu, blog, imageEditing).
+    router.get('/api/sites/:id/capabilities', sync, requireApiKey, (req, res) => {
+      const site = getSiteById(req.params.id);
+      if (!site) return res.status(404).json({ error: `Unknown site: ${req.params.id}` });
+
+      const caps = site.capabilities ?? {};
+      res.json({
+        ok: true,
+        capabilities: {
+          theme: caps.theme === true,
+          menu: caps.menu === true,
+          blog: caps.blog !== false,
+          imageEditing: caps.imageEditing !== false,
+        },
+      });
+    });
 
   return router;
 };

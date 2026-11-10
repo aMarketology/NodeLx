@@ -320,6 +320,34 @@ a {
   opacity: 0.4;
 }
 
+/* ── Capability toggles (per-site permissions) ─────── */
+.site-caps {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.cap-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+.cap-toggle input {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.cap-toggle:hover {
+  color: var(--text);
+}
+
 /* ── Add card ──────────────────────────────────────── */
 .add-card {
   background: transparent;

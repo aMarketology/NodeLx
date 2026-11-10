@@ -135,7 +135,7 @@ module.exports = function mediaRouter(gitSync) {
       if (isSmallImage) {
         const site = getSiteById(safeSite);
         if (!site) return res.status(404).json({ error: 'Unknown site.' });
-        if (!gitSync || !gitSync.isConfigured()) {
+        if (!gitSync || !gitSync.clientFor(site)) {
           return res.status(503).json({ error: 'GitHub sync not configured for this site.' });
         }
 
