@@ -9,6 +9,7 @@ const CAPABILITY_LABELS = {
   blog: 'Blog editor',
   theme: 'Theme editor (fonts + colors)',
   menu: 'Menu / navigation editor',
+  speed: 'Image speed (resize on upload)',
 };
 
 function SiteCard({ site, onUpdate }) {
@@ -122,6 +123,7 @@ export default function Dashboard() {
     <Layout
       actions={
         <>
+          <Link to="/admin/speed" className="btn btn-ghost">Image Speed</Link>
           <Link to="/admin/email" className="btn btn-ghost">Email campaigns</Link>
           <Link to="/admin/onboarding" className="btn btn-primary">+ Add Website</Link>
         </>

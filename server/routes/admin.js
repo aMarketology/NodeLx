@@ -80,6 +80,11 @@ router.get('/admin/editor', requireAuth, (req, res) => {
   serveAdminSpa(req, res);
 });
 
+// GET /admin/speed → image speed panel (developer only)
+router.get('/admin/speed', requireAuth, requireRole('developer'), (req, res) => {
+  serveAdminSpa(req, res);
+});
+
 // GET /admin/logout → clear cookie + redirect
 router.get('/admin/logout', (req, res) => {
   clearAuthCookie(res);

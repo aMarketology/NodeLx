@@ -17,6 +17,7 @@
 const express = require('express');
 const { listSiteMedia, uploadMedia, deleteMedia } = require('../mediaStore');
 const { getSiteById } = require('../sites');
+const { optimizeImage, resolveSettings, renameForFormat } = require('../imageOptimizer');
 
 const ALLOWED_TYPES = new Set([
   'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml',
@@ -127,30 +128,71 @@ module.exports = function mediaRouter(gitSync) {
       return res.status(400).json({ error: 'File size must be between 100 bytes and 50 MB.' });
     }
 
+    // ── Optimize images before storage ────────────────────────────────────
+    // Camera photos arrive at 20+ MB. Vercel's image optimizer rejects sources
+    // over 10 MB, so an unoptimized upload would 500 in production. Resize and
+    // re-encode here so every stored image is web-ready. Best-effort: if sharp
+    // fails we keep the original rather than failing the upload.
+    const site = getSiteById(safeSite);
+    let uploadBuffer = buffer;
+    let uploadType = contentType;
+    let uploadName = safeName;
+    let optimization = null;
+
+    if (IMAGE_TYPES.has(contentType)) {
+      const settings = resolveSettings(site || {});
+      const result = await optimizeImage(buffer, contentType, settings);
+      optimization = {
+        changed: result.changed,
+        reason: result.reason || null,
+        originalBytes: result.originalBytes,
+        bytes: result.bytes,
+        saved: result.saved,
+        width: result.width || null,
+        height: result.height || null,
+      };
+      if (result.changed) {
+        uploadBuffer = result.buffer;
+        uploadType = result.contentType;
+        // Keep the extension honest when converting to webp/avif.
+        if (settings.format !== 'original') {
+          uploadName = renameForFormat(safeName, settings.format);
+        }
+      }
+    }
+
     // ── Routing decision ──────────────────────────────────────────────────
     // Small images → GitHub (repo public/uploads/). Large images / videos → Supabase.
-    const isSmallImage = IMAGE_TYPES.has(contentType) && buffer.length <= GITHUB_THRESHOLD_BYTES;
+    // Decided on the OPTIMIZED size, so a 22 MB photo that shrinks to 400 KB
+    // commits to the repo instead of consuming Supabase storage.
+    const isSmallImage = IMAGE_TYPES.has(uploadType) && uploadBuffer.length <= GITHUB_THRESHOLD_BYTES;
 
     try {
       if (isSmallImage) {
-        const site = getSiteById(safeSite);
         if (!site) return res.status(404).json({ error: 'Unknown site.' });
         if (!gitSync || !gitSync.clientFor(site)) {
           return res.status(503).json({ error: 'GitHub sync not configured for this site.' });
         }
 
-        const remotePath = `public/${safeFolder}/${safeName}`;
+        const remotePath = `public/${safeFolder}/${uploadName}`;
         const commit = await gitSync.commitBinaryFile(
           site,
           remotePath,
-          buffer,
-          `media: upload ${safeName}`,
+          uploadBuffer,
+          `media: upload ${uploadName}`,
         );
-        return res.json({ ok: true, url: `/${safeFolder}/${safeName}`, path: remotePath, source: 'github', commitSha: commit.sha });
+        return res.json({
+          ok: true,
+          url: `/${safeFolder}/${uploadName}`,
+          path: remotePath,
+          source: 'github',
+          commitSha: commit.sha,
+          optimization,
+        });
       }
 
-      const result = await uploadMedia(safeSite, safeFolder, safeName, buffer, contentType);
-      res.json({ ok: true, ...result, source: 'supabase' });
+      const result = await uploadMedia(safeSite, safeFolder, uploadName, uploadBuffer, uploadType);
+      res.json({ ok: true, ...result, source: 'supabase', optimization });
     } catch (err) {
       console.error('[Media] Upload error:', err.message);
       res.status(500).json({ error: 'Upload failed.' });

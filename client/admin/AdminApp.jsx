@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Onboarding from './pages/Onboarding';
 import Editor from './pages/Editor';
 import Email from './pages/Email';
+import Speed from './pages/Speed';
 import './admin.css';
 
 function RequireAuth({ children }) {
@@ -52,6 +53,7 @@ export default function AdminApp() {
             }
           />
           <Route path="/admin/email" element={<RequireAuth><Email /></RequireAuth>} />
+          <Route path="/admin/speed" element={<RequireAuth><Speed /></RequireAuth>} />
           <Route path="*" element={<Navigate to="/admin" replace />} />
         </Routes>
       </BrowserRouter>

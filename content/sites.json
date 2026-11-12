@@ -47,6 +47,40 @@
     "lastEdited": "2026-10-14T00:00:00.000Z"
   },
   {
+    "id": "austincreativelandscaping",
+    "name": "Austin Creative Landscaping",
+    "subtitle": "Landscape Design — Austin, TX",
+    "repo": "ironoak-texas/austincreativelandscaping",
+    "branch": "main",
+    "liveUrl": "https://www.austincreativelandscaping.com",
+    "adminUrl": "/admin/speed?site=austincreativelandscaping",
+    "thumbnail": "",
+    "status": "live",
+    "patEnvVar": "AUSTIN_CREATIVE_PAT",
+    "capabilities": {
+      "text": false,
+      "imageEditing": false,
+      "blog": false,
+      "theme": false,
+      "menu": false,
+      "speed": true
+    },
+    "speed": {
+      "enabled": true,
+      "maxWidth": 2400,
+      "quality": 82,
+      "format": "original"
+    },
+    "video": {
+      "enabled": true,
+      "targetMB": 7,
+      "maxWidth": 1280,
+      "audioKbps": 48,
+      "codec": "h264"
+    },
+    "lastEdited": "2026-11-11T23:42:58.031Z"
+  },
+  {
     "id": "spindler-construction",
     "name": "Spindler Construction",
     "subtitle": "Remodeling and construction - Austin, TX",
