@@ -8,7 +8,7 @@ const router = express.Router();
 const TABLE = 'nodelx_email_campaigns';
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const allowedTypes = new Set(['heading', 'paragraph', 'image', 'project', 'blog', 'cta', 'divider']);
-const fonts = new Set(['Arial, sans-serif', 'Georgia, serif', 'Verdana, sans-serif']);
+const fonts = new Set(['Arial, sans-serif', 'Georgia, serif', 'Verdana, sans-serif', "'Palatino Linotype', 'Book Antiqua', Palatino, serif"]);
 const color = (value) => typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
 const text = (value, max) => typeof value === 'string' && value.length <= max;
 
@@ -33,6 +33,7 @@ function validPayload(draft, design) {
     ids.add(block.id);
     for (const key of ['text', 'imageUrl', 'imageAlt', 'title', 'href', 'buttonLabel']) if (block[key] !== undefined && !text(block[key], 20000)) return false;
     if (block.highlights !== undefined && (!Array.isArray(block.highlights) || block.highlights.length > 200 || !block.highlights.every((h) => h && ['text', 'title', 'buttonLabel'].includes(h.field) && Number.isInteger(h.start) && Number.isInteger(h.end) && h.start >= 0 && h.end > h.start && h.end <= 20000 && color(h.color)))) return false;
+    if (block.links !== undefined && (!Array.isArray(block.links) || block.links.length > 200 || !block.links.every((l) => l && ['text', 'title', 'buttonLabel'].includes(l.field) && Number.isInteger(l.start) && Number.isInteger(l.end) && l.start >= 0 && l.end > l.start && l.end <= 20000 && text(l.href, 20000) && l.href.trim()))) return false;
     return true;
   });
 }
@@ -60,7 +61,7 @@ async function list(req, res) {
 }
 async function create(req, res) {
   const { draft, design, source } = req.body || {};
-  if (!validPayload(draft, design) || (source !== undefined && (source !== 'holiday-2026'))) return res.status(400).json({ error: 'Invalid campaign data' });
+  if (!validPayload(draft, design) || (source !== undefined && source !== 'holiday-2026' && source !== 'holiday-2026-final')) return res.status(400).json({ error: 'Invalid campaign data' });
   try {
     const row = { site_id: req.params.siteId, id: crypto.randomUUID(), draft, design, source: source || null };
     const { data, error } = await getSupabaseClient().from(TABLE).insert(row).select().single();
