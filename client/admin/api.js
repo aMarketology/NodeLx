@@ -7,7 +7,7 @@
 
 import { logRequest, logResponse } from './debugLog';
 
-async function request(path, options = {}) {
+async function req uest(path, options = {}) {
   const method = (options.method || 'GET').toUpperCase();
   const url = BASE + path;
   const started = Date.now();
@@ -80,34 +80,6 @@ export const api = {
       }),
     deleteSite: (id) => request(`/api/sites/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
-  // ── Speed (image optimization) ────────────────────────
-  getSpeedSettings: (siteId) =>
-    request(`/api/speed/settings/${encodeURIComponent(siteId)}`),
-  updateSpeedSettings: (siteId, fields) =>
-    request(`/api/speed/settings/${encodeURIComponent(siteId)}`, {
-      method: 'PATCH',
-      body: JSON.stringify(fields),
-    }),
-  auditSpeed: (siteId) => request(`/api/speed/audit/${encodeURIComponent(siteId)}`),
-  optimizeSpeedRepo: (siteId, limit = 10) =>
-    request(`/api/speed/optimize-repo/${encodeURIComponent(siteId)}`, {
-      method: 'POST',
-      body: JSON.stringify({ limit }),
-    }),
-
-  // ── Speed (video compression) ─────────────────────────
-  updateVideoSettings: (siteId, fields) =>
-    request(`/api/speed/video-settings/${encodeURIComponent(siteId)}`, {
-      method: 'PATCH',
-      body: JSON.stringify(fields),
-    }),
-  auditVideos: (siteId) => request(`/api/speed/video-audit/${encodeURIComponent(siteId)}`),
-  optimizeVideo: (siteId, path) =>
-    request(`/api/speed/optimize-video/${encodeURIComponent(siteId)}`, {
-      method: 'POST',
-      body: JSON.stringify({ path }),
-    }),
-
   // ── Editor ────────────────────────────────────────────
     editorContext: (pageId) => request(`/api/editor/site?page=${encodeURIComponent(pageId)}`),
     saveContent: (pageId, payload) =>
@@ -115,7 +87,7 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify(payload),
       }),
-    listEmailCampaigns: (siteId) => request(`/api/editor/sites/${encodeURIComponent(siteId)}/email/campaigns`),
+
     // ── Editor bridge (cookie auth) — read/write the client's GitHub content ──
     // Diagnose the client site's CSP (frame-ancestors) to see if NodeLx can iframe it.
     diagnoseEditor: (pageId) => request(`/api/editor/diagnose?page=${encodeURIComponent(pageId)}`),

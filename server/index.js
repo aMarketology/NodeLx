@@ -11,9 +11,6 @@ const WebSocketServer = require('./websocket');
 const adminRoutes   = require('./routes/admin');
 const sitesRoutes   = require('./routes/sites');
 const mediaRoutes   = require('./routes/media');
-const speedRoutes   = require('./routes/speed');
-const emailCampaignRoutes = require('./routes/email-campaigns');
-const blogPostRoutes = require('./routes/blog-posts');
 const { ensureMediaBucket } = require('./mediaStore');
 const { getSiteByPageId, getSites } = require('./sites');
 const { getToken } = require('./siteTokens');
@@ -68,15 +65,6 @@ class NodeLxServer {
 
     // Media router (Supabase image storage + GitHub small-image commits)
     this.app.use(mediaRoutes(this.gitSync));
-
-    // Speed router (image optimization settings, repo audit, batch optimize)
-    this.app.use(speedRoutes(this.gitSync));
-
-    // Private blog records: bridge API key or developer session.
-    this.app.use(blogPostRoutes);
-
-    // Private campaign records: bridge API key or developer session.
-    this.app.use(emailCampaignRoutes);
 
     // ─── 🔒 API security boundary ───────────────────────────────────────────
     // Public: content reads + health (needed by the live site). Everything else
