@@ -7,7 +7,7 @@
 
 import { logRequest, logResponse } from './debugLog';
 
-async function req uest(path, options = {}) {
+async function request(path, options = {}) {
   const method = (options.method || 'GET').toUpperCase();
   const url = BASE + path;
   const started = Date.now();
