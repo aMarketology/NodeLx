@@ -1,6 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
-const { getSiteById } = require('../sites');
+const { getSiteById, getSites } = require('../sites');
 const { getSupabaseClient } = require('../supabase');
 const { requireAuth, requireRole } = require('../auth/middleware');
 
@@ -16,15 +16,18 @@ const text = (value, max) => typeof value === 'string' && value.length <= max;
 
 function apiKey(req, res, next) {
   const key = process.env.NODELX_API_KEY;
-  if (!key) return res.status(503).json({ error: 'NODELX_API_KEY is not configured' });
+  if (!key) return res.status(503).json({ error: 'NODELX_API_KEY is not configured on the NODELKX server.' });
   const provided = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
   const a = crypto.createHash('sha256').update(provided).digest();
   const b = crypto.createHash('sha256').update(key).digest();
-  if (!crypto.timingSafeEqual(a, b)) return res.status(401).json({ error: 'Unauthorized' });
+  if (!provided || !crypto.timingSafeEqual(a, b)) return res.status(401).json({ error: 'Unauthorized — NODELX_API_KEY missing or does not match the NODELKX server.' });
   next();
 }
 function site(req, res, next) {
-  if (!getSiteById(req.params.siteId)) return res.status(404).json({ error: 'Unknown site' });
+  if (!getSiteById(req.params.siteId)) {
+    const available = getSites().map((s) => s.id).join(', ') || '(none)'
+    return res.status(404).json({ error: `Unknown site "${req.params.siteId}". Registered sites: ${available}` })
+  }
   next();
 }
 function validPayload(draft, design) {
@@ -118,16 +121,13 @@ async function remove(req, res) {
   } catch (error) { return failure(res, error); }
 }
 
-router.use(express.json({ limit: '16mb' }));
-router.use(apiKey);
-router.use('/:siteId', site);
-router.get(bridge, requireAuth, requireRole('editor'), list);
-router.post(bridge, requireAuth, requireRole('editor'), create);
-router.put(bridge + '/:id', requireAuth, requireRole('editor'), update);
-router.delete(bridge + '/:id', requireAuth, requireRole('editor'), remove);
-router.get(developer, requireAuth, requireRole('developer'), list);
-router.post(developer, requireAuth, requireRole('developer'), create);
-router.put(developer + '/:id', requireAuth, requireRole('developer'), update);
-router.delete(developer + '/:id', requireAuth, requireRole('developer'), remove);
+router.get(bridge, apiKey, site, list);
+router.post(bridge, apiKey, site, create);
+router.put(`${bridge}/:id`, apiKey, site, update);
+router.delete(`${bridge}/:id`, apiKey, site, remove);
+router.get(developer, requireAuth, requireRole('developer'), site, list);
+router.post(developer, requireAuth, requireRole('developer'), site, create);
+router.put(developer + '/:id', requireAuth, requireRole('developer'), site, update);
+router.delete(developer + '/:id', requireAuth, requireRole('developer'), site, remove);
 
 module.exports = router;
