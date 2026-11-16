@@ -7,7 +7,7 @@ const { requireAuth, requireRole } = require('../auth/middleware');
 const router = express.Router();
 const TABLE = 'nodelx_email_campaigns';
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const allowedTypes = new Set(['heading', 'paragraph', 'image', 'project', 'blog', 'cta', 'divider']);
+const allowedTypes = new Set(['heading', 'subheading', 'paragraph', 'image', 'project', 'blog', 'cta', 'divider']);
 const fonts = new Set(['Arial, sans-serif', 'Georgia, serif', 'Verdana, sans-serif', "'Palatino Linotype', 'Book Antiqua', Palatino, serif"]);
 const headingFonts = new Set(['Arial, sans-serif', 'Georgia, serif', '"Playfair Display", Georgia, serif', 'Copperplate, "Copperplate Gothic Light", Georgia, serif', '"Snell Roundhand", "Brush Script MT", cursive', "'Palatino Linotype', 'Book Antiqua', Palatino, serif"]);
 const comboIds = new Set(['basic', 'classic-serif', 'holiday', 'holiday-christmas', 'holiday-pine', 'holiday-gold', 'holiday-engraved', 'holiday-script', 'modern']);
@@ -38,6 +38,7 @@ function validPayload(draft, design) {
   if (design.headingFont !== undefined && !headingFonts.has(design.headingFont)) return `Unsupported heading font: "${design.headingFont}".`;
   if (design.fontComboId !== undefined && !comboIds.has(design.fontComboId)) return `Unsupported font combo: "${design.fontComboId}".`;
   if (!Number.isFinite(design.headingSize) || design.headingSize < 18 || design.headingSize > 56) return 'Heading size must be between 18 and 56.';
+  if (design.subheadingSize !== undefined && (!Number.isFinite(design.subheadingSize) || design.subheadingSize < 18 || design.subheadingSize > 56)) return 'Subheading size must be between 18 and 56.';
   if (!Number.isFinite(design.paragraphSize) || design.paragraphSize < 12 || design.paragraphSize > 20) return 'Paragraph size must be between 12 and 20.';
   if (!color(design.textColor)) return 'Text color must be a 6-digit hex color like #34506a.';
   if (!color(design.accentColor)) return 'Accent color must be a 6-digit hex color like #2e86c1.';
