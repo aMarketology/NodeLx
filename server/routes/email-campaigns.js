@@ -13,6 +13,20 @@ const headingFonts = new Set(['Arial, sans-serif', 'Georgia, serif', '"Playfair 
 const comboIds = new Set(['basic', 'classic-serif', 'holiday', 'holiday-christmas', 'holiday-pine', 'holiday-gold', 'holiday-engraved', 'holiday-script', 'modern']);
 const color = (value) => typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
 const text = (value, max) => typeof value === 'string' && value.length <= max;
+// Smart/curly quotes are visually identical to straight quotes but fail exact
+// string matches. Normalize them so fonts copied from rich editors still save.
+const normalizeQuotes = (value) => typeof value === 'string'
+  ? value.replace(/[\u2018\u2019\u201A\u201B]/g, "'").replace(/[\u201C\u201D\u201E\u201F]/g, '"')
+  : value;
+// Normalize font names so curly quotes from AI or rich editors match the
+// straight-quote entries in the allowed-fonts sets above.
+const normalizeDesign = (design) => {
+  if (!design || typeof design !== 'object') return design;
+  const next = { ...design };
+  if (typeof next.font === 'string') next.font = normalizeQuotes(next.font);
+  if (typeof next.headingFont === 'string') next.headingFont = normalizeQuotes(next.headingFont);
+  return next;
+};
 
 function apiKey(req, res, next) {
   const key = process.env.NODELX_API_KEY;
@@ -85,7 +99,8 @@ async function list(req, res) {
 }
 
 async function create(req, res) {
-  const { draft, design, source } = req.body || {};
+  const { draft, design: rawDesign, source } = req.body || {};
+  const design = normalizeDesign(rawDesign);
   const invalid = validPayload(draft, design);
   if (invalid) return res.status(400).json({ error: invalid });
   if (source !== undefined && source !== 'holiday-2026' && source !== 'holiday-2026-final') return res.status(400).json({ error: `Unsupported campaign source: "${source}".` });
@@ -99,9 +114,10 @@ async function create(req, res) {
 }
 async function update(req, res) {
   const { id } = req.params;
-  const { draft, design, revision } = req.body || {};
+  const { draft, design: rawDesign, revision } = req.body || {};
   if (!uuid.test(id)) return res.status(400).json({ error: 'Invalid campaign id.' });
   if (!Number.isSafeInteger(revision) || revision < 1) return res.status(400).json({ error: 'A valid revision number is required.' });
+  const design = normalizeDesign(rawDesign);
   const invalid = validPayload(draft, design);
   if (invalid) return res.status(400).json({ error: invalid });
   try {
