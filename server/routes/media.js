@@ -1,13 +1,11 @@
 /**
  * routes/media.js
  *
- * Media upload API — auto-routes by size/type:
+ * Media upload API — all uploads go to Supabase:
  *
  *   GET    /api/media/:siteId   list all media for a site (Supabase bucket)
- *   POST   /api/media/upload    upload (base64 JSON body)
- *       • small images (≤ threshold) → committed to the client repo public/uploads/
- *         via the PAT (GitHub Contents API) — instant, no external dependency.
- *       • large images / videos      → Supabase per-client bucket (media-<siteId>).
+ *   POST   /api/media/upload    upload (base64 JSON body) → Supabase per-client
+ *                               bucket (media-<siteId>).
  *   DELETE /api/media           delete media by storage path
  *
  * Auth: shared NODELX_API_KEY (Bearer token), matching routes/sites.js.
@@ -25,9 +23,6 @@ const ALLOWED_TYPES = new Set([
 ]);
 
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml']);
-
-// Small images at or below this size are committed to the repo; larger go to Supabase.
-const GITHUB_THRESHOLD_BYTES = Number(process.env.MEDIA_GITHUB_THRESHOLD_BYTES || 1_048_576); // 1 MB
 
 // Normalize a single path segment: strip extension, replace runs of
 // whitespace with a hyphen, drop any character that isn't alphanumeric,
@@ -88,7 +83,7 @@ module.exports = function mediaRouter(gitSync) {
       res.json({ ok: true, siteId, images });
     } catch (err) {
       console.error('[Media] List error:', err.message);
-      res.status(500).json({ error: 'Failed to list media.' });
+      res.status(500).json({ error: `Failed to list media: ${err.message}` });
     }
   });
 
@@ -162,40 +157,15 @@ module.exports = function mediaRouter(gitSync) {
     }
 
     // ── Routing decision ──────────────────────────────────────────────────
-    // Small images → GitHub (repo public/uploads/). Large images / videos → Supabase.
-    // Decided on the OPTIMIZED size, so a 22 MB photo that shrinks to 400 KB
-    // commits to the repo instead of consuming Supabase storage.
-    const isSmallImage = IMAGE_TYPES.has(uploadType) && uploadBuffer.length <= GITHUB_THRESHOLD_BYTES;
+    // All uploads go to Supabase (per-client bucket). The GitHub small-image
+    // path was removed so media never depends on a PAT or repo access.
 
     try {
-      if (isSmallImage) {
-        if (!site) return res.status(404).json({ error: 'Unknown site.' });
-        if (!gitSync || !gitSync.clientFor(site)) {
-          return res.status(503).json({ error: 'GitHub sync not configured for this site.' });
-        }
-
-        const remotePath = `public/${safeFolder}/${uploadName}`;
-        const commit = await gitSync.commitBinaryFile(
-          site,
-          remotePath,
-          uploadBuffer,
-          `media: upload ${uploadName}`,
-        );
-        return res.json({
-          ok: true,
-          url: `/${safeFolder}/${uploadName}`,
-          path: remotePath,
-          source: 'github',
-          commitSha: commit.sha,
-          optimization,
-        });
-      }
-
       const result = await uploadMedia(safeSite, safeFolder, uploadName, uploadBuffer, uploadType);
       res.json({ ok: true, ...result, source: 'supabase', optimization });
     } catch (err) {
       console.error('[Media] Upload error:', err.message);
-      res.status(500).json({ error: 'Upload failed.' });
+      res.status(500).json({ error: `Upload failed: ${err.message}` });
     }
   });
 
