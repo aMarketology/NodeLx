@@ -234,6 +234,20 @@ export default function Editor() {
     return () => clearInterval(t);
   }, [postToFrame]);
 
+  const syncRichValue = () => {
+    const html = richRef.current?.innerHTML ?? '';
+    handleEditChange(html);
+  };
+
+  // Set the editor's initial HTML when a NEW element is selected (not on every
+  // keystroke — that would reset the caret). The browser then owns the content.
+  useEffect(() => {
+    if (selectedId && richRef.current) {
+      richRef.current.innerHTML = editValue;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
+
   return (
     <div className="editor-shell">
       <header className="admin-bar">
@@ -315,13 +329,15 @@ export default function Editor() {
                 <span className="sidebar-id">{selectedId}</span>
                 <button className="btn btn-ghost" onClick={() => setSelectedId(null)}>✕</button>
               </div>
-              <textarea
-                className="sidebar-textarea"
-                value={editValue}
-                onChange={(e) => handleEditChange(e.target.value)}
-                placeholder="Edit value…"
-                rows={6}
-                autoFocus
+              <div
+                ref={richRef}
+                className="sidebar-rte"
+                contentEditable
+                suppressContentEditableWarning
+                role="textbox"
+                aria-label="Edit value"
+                onInput={syncRichValue}
+                onBlur={syncRichValue}
               />
               <div className="sidebar-hint">
                 Changes preview live in the iframe. Click Publish to commit.
